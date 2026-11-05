@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>coinband</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header>
+    <div class="brand">coinband</div>
+    <div class="tagline">Walk-forward backtest of Timestral forecasts on Binance pairs</div>
+    <div class="disclaimer">Unofficial. Not affiliated with Mistral AI or Binance. Not financial advice.</div>
+  </header>
+
+  <main>
+    <aside>
+      <form id="run-form" autocomplete="off">
+        <label>Pair
+          <input id="symbol" name="symbol" list="symbols" value="BTCUSDT" spellcheck="false" required>
+          <datalist id="symbols"></datalist>
+        </label>
+        <label>Interval
+          <select id="interval" name="interval">
+            <option>1m</option><option>5m</option><option>15m</option><option>30m</option>
+            <option selected>1h</option><option>2h</option><option>4h</option><option>6h</option>
+            <option>12h</option><option>1d</option><option>1w</option>
+          </select>
+        </label>
+        <label>Model
+          <select id="model" name="model"></select>
+        </label>
+        <div class="row">
+          <label>Bars to fetch
+            <input id="bars" name="bars" type="number" min="100" max="50000" step="100" value="3000">
+          </label>
+          <label>Context
+            <input id="context" name="context" type="number" min="32" max="32768" step="32" value="2048">
+          </label>
+        </div>
+        <div class="row">
+          <label>Horizon
+            <input id="horizon" name="horizon" type="number" min="1" max="512" value="24">
+          </label>
+          <label>Stride
+            <input id="stride" name="stride" type="number" min="1" max="10000" value="24">
+          </label>
+        </div>
+        <label>Max origins
+          <input id="max_origins" name="max_origins" type="number" min="1" max="2000" value="400">
+        </label>
+        <button id="run" type="submit">Run backtest</button>
+        <div id="progress" class="progress" hidden>
+          <div class="bar"><div id="progress-fill"></div></div>
+          <div id="progress-text"></div>
+        </div>
+        <div id="error" class="error" hidden></div>
+        <p class="hint">
+          Each origin forecasts <em>horizon</em> bars from the <em>context</em> bars before it.
+          Origins are <em>stride</em> bars apart and end at the last closed candle, so the final fan is a live forecast.
+        </p>
+      </form>
+    </aside>
+
+    <section class="stage">
+      <div class="canvas-wrap">
+        <canvas id="chart"></canvas>
+        <div id="empty" class="empty">Pick a pair and run a backtest.</div>
+      </div>
+
+      <div class="transport">
+        <button id="play" title="Play / pause (space)" disabled>Play</button>
+        <button id="restart" title="Restart" disabled>Restart</button>
+        <input id="scrub" type="range" min="0" max="1000" value="0" disabled>
+        <label>Speed
+          <select id="speed">
+            <option value="auto" selected>auto (30 s)</option>
+            <option value="10">10 bars/s</option>
+            <option value="25">25 bars/s</option>
+            <option value="50">50 bars/s</option>
+            <option value="100">100 bars/s</option>
+            <option value="250">250 bars/s</option>
+            <option value="1000">1000 bars/s</option>
+          </select>
+        </label>
+        <div class="seg" role="group" aria-label="View">
+          <button id="view-follow" class="on" type="button">Follow</button>
+          <button id="view-full" type="button">Full</button>
+        </div>
+        <label class="check"><input id="trail" type="checkbox" checked> Trail</label>
+        <button id="record" title="Record the playback to .webm" disabled>Record .webm</button>
+      </div>
+
+      <div class="metrics" id="metrics">
+        <div class="metric"><div class="k">80% band coverage</div><div class="v" id="m-coverage">–</div><div class="s">target 80%</div></div>
+        <div class="metric"><div class="k">Median MAE vs naive</div><div class="v" id="m-skill">–</div><div class="s" id="m-mae">naive = price stays flat</div></div>
+        <div class="metric"><div class="k">Direction at horizon end</div><div class="v" id="m-direction">–</div><div class="s">hit rate of the median</div></div>
+        <div class="metric"><div class="k">Scored origins</div><div class="v" id="m-scored">–</div><div class="s" id="m-breaches">breaches</div></div>
+        <div class="metric live"><div class="k">Live forecast</div><div class="v" id="m-live">–</div><div class="s" id="m-live-band"></div></div>
+      </div>
+    </section>
+  </main>
+
+  <script src="/app.js"></script>
+</body>
+</html>

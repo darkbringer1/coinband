@@ -43,11 +43,11 @@
             <input id="horizon" name="horizon" type="number" min="1" max="512" value="24">
           </label>
           <label>Stride
-            <input id="stride" name="stride" type="number" min="1" max="10000" value="24">
+            <input id="stride" name="stride" type="number" min="1" max="10000" value="1">
           </label>
         </div>
         <label>Max origins
-          <input id="max_origins" name="max_origins" type="number" min="1" max="2000" value="400">
+          <input id="max_origins" name="max_origins" type="number" min="1" max="10000" value="1000">
         </label>
         <button id="run" type="submit">Run backtest</button>
         <div id="progress" class="progress" hidden>
@@ -57,7 +57,8 @@
         <div id="error" class="error" hidden></div>
         <p class="hint">
           Each origin forecasts <em>horizon</em> bars from the <em>context</em> bars before it.
-          Origins are <em>stride</em> bars apart and end at the last closed candle, so the final fan is a live forecast.
+          A new forecast is made every <em>stride</em> bars (1 = every bar, so the cone moves with the price).
+          The last one starts at the last closed candle: a live forecast. <em>Max origins</em> caps how many bars are replayed.
         </p>
       </form>
     </aside>

@@ -24,10 +24,10 @@ LO, HI = 0.1, 0.9  # the scored 80% band
 class BacktestParams:
     context: int = 2048
     horizon: int = 24
-    stride: int = 24
-    max_origins: int = 400
+    stride: int = 1
+    max_origins: int = 1000
     min_context: int = 64
-    batch_size: int = 32
+    batch_size: int = 64
 
     def validate(self, n_bars: int) -> None:
         if self.horizon < 1:

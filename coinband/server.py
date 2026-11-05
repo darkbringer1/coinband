@@ -39,7 +39,7 @@ LIMITS = {
     "context": (32, 32_768),
     "horizon": (1, 512),
     "stride": (1, 10_000),
-    "max_origins": (1, 2_000),
+    "max_origins": (1, 10_000),
 }
 JOB_TTL_S = 3600
 MAX_JOBS = 50
@@ -126,7 +126,7 @@ def parse_request(body: dict) -> dict:
     model = str(body.get("model", DEFAULT_MODEL))
     if model not in {m["id"] for m in MODELS}:
         raise ValueError("unknown model")
-    defaults = {"bars": 3000, "context": 2048, "horizon": 24, "stride": 24, "max_origins": 400}
+    defaults = {"bars": 3000, "context": 2048, "horizon": 24, "stride": 1, "max_origins": 1000}
     out: dict = {"symbol": symbol, "interval": interval, "model": model}
     for key, default in defaults.items():
         raw = body.get(key, default)

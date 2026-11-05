@@ -8,6 +8,7 @@ const COLORS = {
   grid: "rgba(139,152,168,0.12)",
   axis: "#8b98a8",
   price: "#e6edf3",
+  future: "rgba(230,237,243,0.38)",
   band80: "rgba(74,163,255,0.30)",
   band90: "rgba(74,163,255,0.14)",
   trail: "74,163,255",
@@ -20,7 +21,7 @@ const COLORS = {
 };
 const L = { P05: 0, P10: 1, P50: 2, P90: 3, P95: 4 };
 const FORM_FIELDS = ["symbol", "interval", "model", "bars", "context", "horizon", "stride", "max_origins"];
-const STORE_KEY = "coinband.form";
+const STORE_KEY = "coinband.form.v2";
 const AUTO_SECONDS = 30;
 const HOLD_SECONDS = 2; // pause on the live forecast at the end of a recording
 
@@ -191,10 +192,14 @@ function loadResult(r) {
     for (let k = 0; k < H && o.index + k < n; k++) governed[o.index + k] = oi;
   });
   let breaches = 0;
+  const ribLo = new Float64Array(n).fill(NaN);
+  const ribHi = new Float64Array(n).fill(NaN);
   for (let t = 0; t < n; t++) {
     const oi = governed[t];
     if (oi < 0) continue;
     const b = origins[oi].bands[t - origins[oi].index];
+    ribLo[t] = b[L.P10];
+    ribHi[t] = b[L.P90];
     if (r.close[t] < b[L.P10] || r.close[t] > b[L.P90]) {
       breach[t] = 1;
       breaches++;
@@ -207,6 +212,8 @@ function loadResult(r) {
     origins,
     breach,
     breaches,
+    ribLo,
+    ribHi,
     start: origins[0].index,
     end: n,
     live: origins[origins.length - 1],
@@ -235,6 +242,30 @@ function currentOriginIndex(p) {
     if (os[mid].index <= p) { ans = mid; lo = mid + 1; } else hi = mid - 1;
   }
   return ans;
+}
+
+// The cone at playhead p: the forecast made at the current origin, anchored on the price head.
+// With a forecast every bar, it morphs between consecutive origins so it moves and breathes smoothly.
+function coneAt(p) {
+  const d = state.data;
+  const ci = currentOriginIndex(p);
+  if (ci < 0) return null;
+  const o = d.origins[ci];
+  const next = d.origins[ci + 1];
+  const frac = p - o.index;
+  const H = d.H;
+  const xs = new Array(H);
+  let bands = o.bands;
+  let ax = o.index - 1, ay = d.close[o.index - 1];
+  if (next && next.index - o.index === 1 && frac > 0) {
+    bands = o.bands.map((step, k) => step.map((v, j) => v + (next.bands[k][j] - v) * frac));
+    ax += frac;
+    ay += (d.close[o.index] - ay) * frac;
+    for (let k = 0; k < H; k++) xs[k] = o.index + k + frac;
+  } else {
+    for (let k = 0; k < H; k++) xs[k] = o.index + k;
+  }
+  return { ci, ax, ay, xs, bands };
 }
 
 function speedBarsPerSec() {
@@ -322,21 +353,24 @@ function targetCamera(p) {
   }
   // y range over what is visible: price up to the playhead and the bands drawn.
   let lo = Infinity, hi = -Infinity;
-  const a = Math.max(0, Math.floor(x0)), b = Math.min(d.n - 1, Math.ceil(Math.min(x1, p)));
+  const a = Math.max(0, Math.floor(x0)), b = Math.min(d.n - 1, Math.ceil(x1));
   const step = Math.max(1, Math.floor((b - a) / 2000));
   for (let t = a; t <= b; t += step) {
     lo = Math.min(lo, d.close[t]);
     hi = Math.max(hi, d.close[t]);
   }
-  const ci = currentOriginIndex(p);
-  const first = state.trail || state.view === "full" ? 0 : Math.max(0, ci);
-  for (let i = Math.max(0, first); i <= ci; i++) {
-    const o = d.origins[i];
-    if (o.end < x0 || o.index > x1) continue;
-    const lim = i === ci ? d.H : Math.min(d.H, Math.ceil(p) - o.index);
-    for (let k = 0; k < lim; k++) {
-      lo = Math.min(lo, o.bands[k][i === ci ? L.P05 : L.P10]);
-      hi = Math.max(hi, o.bands[k][i === ci ? L.P95 : L.P90]);
+  if (state.trail) {
+    for (let t = Math.max(a, d.start); t <= b; t += step) {
+      if (isNaN(d.ribLo[t])) continue;
+      lo = Math.min(lo, d.ribLo[t]);
+      hi = Math.max(hi, d.ribHi[t]);
+    }
+  }
+  const cone = coneAt(p);
+  if (cone) {
+    for (const s of cone.bands) {
+      lo = Math.min(lo, s[L.P05]);
+      hi = Math.max(hi, s[L.P95]);
     }
   }
   if (!isFinite(lo)) { lo = d.close[d.n - 1] * 0.95; hi = d.close[d.n - 1] * 1.05; }
@@ -404,67 +438,40 @@ function draw() {
   ctx.rect(plot.l, plot.t, plot.r - plot.l, plot.b - plot.t);
   ctx.clip();
 
-  const ci = currentOriginIndex(p);
+  const pxPerBar = (plot.r - plot.l) / (x1 - x0);
 
-  // trail of past bands (only their realized part)
-  if (state.trail) {
-    for (let i = 0; i < ci; i++) {
-      const o = d.origins[i];
-      if (o.end < x0 || o.index > x1) continue;
-      const lim = Math.min(d.H, Math.ceil(p) - o.index);
-      if (lim <= 0) continue;
-      const age = ci - i;
-      const alpha = 0.06 + 0.16 * Math.exp(-age / 6);
-      fillBand(o, 0, lim, L.P10, L.P90, `rgba(${COLORS.trail},${alpha})`, X, Y, true);
-    }
-  }
+  // trail: the 80% band each realized bar was given by the forecast that was current for it
+  if (state.trail) drawRibbon(Math.max(d.start, Math.floor(x0) - 1), Math.min(d.n - 1, Math.floor(p) - 1), pxPerBar, X, Y);
 
-  // current fan: the whole horizon, ahead of the playhead
-  if (ci >= 0) {
-    const o = d.origins[ci];
-    fillBand(o, 0, d.H, L.P05, L.P95, COLORS.band90, X, Y, true);
-    fillBand(o, 0, d.H, L.P10, L.P90, COLORS.band80, X, Y, true);
-    ctx.strokeStyle = COLORS.median;
-    ctx.lineWidth = 2;
-    ctx.setLineDash([6, 4]);
-    ctx.beginPath();
-    ctx.moveTo(X(o.index - 1), Y(d.close[o.index - 1]));
-    for (let k = 0; k < d.H; k++) ctx.lineTo(X(o.index + k), Y(o.bands[k][L.P50]));
-    ctx.stroke();
-    ctx.setLineDash([]);
-  }
+  // the cone: current forecast, anchored on the price head
+  const cone = coneAt(p);
+  if (cone) drawCone(cone, X, Y);
 
-  // price up to the playhead, with a partial last segment for smooth motion
+  // the real price over the whole view: bright behind the playhead, dimmer ahead of it
   const lastBar = Math.min(d.n - 1, Math.floor(p) - 1);
   const a = Math.max(0, Math.floor(x0) - 1);
+  const z = Math.min(d.n - 1, Math.ceil(x1) + 1);
+  const frac = p - Math.floor(p);
+  let headX = lastBar, headY = d.close[lastBar];
+  if (frac > 0 && lastBar + 1 < d.n) {
+    headX = lastBar + frac;
+    headY = d.close[lastBar] + (d.close[lastBar + 1] - d.close[lastBar]) * frac;
+  }
+  ctx.lineJoin = "round";
+  ctx.lineWidth = 1.6;
+  if (headX < z) {
+    ctx.strokeStyle = COLORS.future;
+    ctx.beginPath();
+    ctx.moveTo(X(Math.max(headX, a)), Y(headX >= a ? headY : d.close[a]));
+    traceSeries(Math.max(lastBar + 1, a), z, pxPerBar, X, Y);
+    ctx.stroke();
+  }
   if (lastBar >= a) {
     ctx.strokeStyle = COLORS.price;
-    ctx.lineWidth = 1.6;
-    ctx.lineJoin = "round";
     ctx.beginPath();
-    const pxPerBar = (plot.r - plot.l) / (x1 - x0);
-    if (pxPerBar >= 0.5) {
-      ctx.moveTo(X(a), Y(d.close[a]));
-      for (let t = a + 1; t <= lastBar; t++) ctx.lineTo(X(t), Y(d.close[t]));
-    } else {
-      // more bars than pixels: draw a min/max envelope per pixel column
-      const per = Math.ceil(1 / pxPerBar);
-      let first = true;
-      for (let t = a; t <= lastBar; t += per) {
-        let mn = Infinity, mx = -Infinity;
-        for (let u = t; u < Math.min(t + per, lastBar + 1); u++) { mn = Math.min(mn, d.close[u]); mx = Math.max(mx, d.close[u]); }
-        const x = X(t);
-        if (first) { ctx.moveTo(x, Y(mx)); first = false; } else ctx.lineTo(x, Y(mx));
-        ctx.lineTo(x, Y(mn));
-      }
-    }
-    // partial segment toward the next bar
-    const frac = p - Math.floor(p);
-    const next = lastBar + 1;
-    if (frac > 0 && next < d.n && next === Math.floor(p)) {
-      const v = d.close[lastBar] + (d.close[next] - d.close[lastBar]) * frac;
-      ctx.lineTo(X(lastBar + frac), Y(v));
-    }
+    ctx.moveTo(X(a), Y(d.close[a]));
+    traceSeries(a + 1, lastBar, pxPerBar, X, Y);
+    ctx.lineTo(X(headX), Y(headY));
     ctx.stroke();
 
     // breaches: realized bars outside the band that was current for them
@@ -476,10 +483,27 @@ function draw() {
       ctx.arc(X(t), Y(d.close[t]), r, 0, Math.PI * 2);
       ctx.fill();
     }
-    // head dot
+  }
+
+  // the real future against the cone: ring each bar ahead that the price leaves the cone at
+  if (cone) {
+    ctx.strokeStyle = COLORS.bad;
+    ctx.lineWidth = 1.5;
+    const r = Math.max(2.5, Math.min(4.5, pxPerBar * 0.5));
+    for (let t = lastBar + 1; t < d.n; t++) {
+      const band = coneBandAt(cone, t);
+      if (!band) break;
+      if (d.close[t] >= band[0] && d.close[t] <= band[1]) continue;
+      ctx.beginPath();
+      ctx.arc(X(t), Y(d.close[t]), r, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+  }
+
+  if (lastBar >= 0) {
     ctx.fillStyle = COLORS.median;
     ctx.beginPath();
-    ctx.arc(X(lastBar), Y(d.close[lastBar]), 4, 0, Math.PI * 2);
+    ctx.arc(X(headX), Y(headY), 4, 0, Math.PI * 2);
     ctx.fill();
   }
 
@@ -503,18 +527,93 @@ function draw() {
   drawHud(w, h, plot);
 }
 
-function fillBand(o, k0, k1, loL, hiL, color, X, Y, pinch = false) {
+// Append close[t0..t1] to the current path; past one bar per pixel, a min/max envelope per column.
+function traceSeries(t0, t1, pxPerBar, X, Y) {
+  const c = state.data.close;
+  if (pxPerBar >= 0.5) {
+    for (let t = t0; t <= t1; t++) ctx.lineTo(X(t), Y(c[t]));
+    return;
+  }
+  const per = Math.ceil(1 / pxPerBar);
+  for (let t = t0; t <= t1; t += per) {
+    let mn = Infinity, mx = -Infinity;
+    for (let u = t; u <= Math.min(t + per - 1, t1); u++) { mn = Math.min(mn, c[u]); mx = Math.max(mx, c[u]); }
+    ctx.lineTo(X(t), Y(mx));
+    ctx.lineTo(X(t), Y(mn));
+  }
+}
+
+// The cone's 80% band [P10, P90] at bar t, interpolated along its drawn outline; null past the tip.
+function coneBandAt({ ax, ay, xs, bands }, t) {
+  if (t <= ax || t > xs[xs.length - 1]) return null;
+  let k = 0;
+  while (xs[k] < t) k++;
+  const x0 = k === 0 ? ax : xs[k - 1];
+  const lo0 = k === 0 ? ay : bands[k - 1][L.P10];
+  const hi0 = k === 0 ? ay : bands[k - 1][L.P90];
+  const w = xs[k] === x0 ? 1 : (t - x0) / (xs[k] - x0);
+  return [lo0 + (bands[k][L.P10] - lo0) * w, hi0 + (bands[k][L.P90] - hi0) * w];
+}
+
+function drawRibbon(a, b, pxPerBar, X, Y) {
   const d = state.data;
-  ctx.fillStyle = color;
+  if (b < a) return;
+  const step = pxPerBar >= 0.5 ? 1 : Math.ceil(1 / pxPerBar);
+  ctx.fillStyle = `rgba(${COLORS.trail},0.16)`;
+  // one polygon per run of bars that have a band
+  let t = a;
+  while (t <= b) {
+    while (t <= b && isNaN(d.ribLo[t])) t++;
+    const run = [];
+    while (t <= b && !isNaN(d.ribLo[t])) { run.push(t); t += step; }
+    if (run.length < 2) continue;
+    ctx.beginPath();
+    ctx.moveTo(X(run[0]), Y(d.ribHi[run[0]]));
+    for (const u of run) ctx.lineTo(X(u), Y(d.ribHi[u]));
+    for (let i = run.length - 1; i >= 0; i--) ctx.lineTo(X(run[i]), Y(d.ribLo[run[i]]));
+    ctx.closePath();
+    ctx.fill();
+  }
+}
+
+function drawCone({ ax, ay, xs, bands }, X, Y) {
+  const fill = (loL, hiL, color) => {
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(X(ax), Y(ay));
+    for (let k = 0; k < xs.length; k++) ctx.lineTo(X(xs[k]), Y(bands[k][hiL]));
+    for (let k = xs.length - 1; k >= 0; k--) ctx.lineTo(X(xs[k]), Y(bands[k][loL]));
+    ctx.closePath();
+    ctx.fill();
+  };
+  fill(L.P05, L.P95, COLORS.band90);
+  fill(L.P10, L.P90, COLORS.band80);
+  // crisp edges on the 80% band make the widening and narrowing easy to follow
+  ctx.strokeStyle = "rgba(74,163,255,0.75)";
+  ctx.lineWidth = 1;
+  for (const lvl of [L.P10, L.P90]) {
+    ctx.beginPath();
+    ctx.moveTo(X(ax), Y(ay));
+    for (let k = 0; k < xs.length; k++) ctx.lineTo(X(xs[k]), Y(bands[k][lvl]));
+    ctx.stroke();
+  }
+  ctx.strokeStyle = COLORS.median;
+  ctx.lineWidth = 2;
+  ctx.setLineDash([6, 4]);
   ctx.beginPath();
-  const startX = pinch ? X(o.index - 1) : X(o.index + k0);
-  const anchor = d.close[o.index - 1];
-  if (pinch) ctx.moveTo(startX, Y(anchor));
-  else ctx.moveTo(startX, Y(o.bands[k0][hiL]));
-  for (let k = k0; k < k1; k++) ctx.lineTo(X(o.index + k), Y(o.bands[k][hiL]));
-  for (let k = k1 - 1; k >= k0; k--) ctx.lineTo(X(o.index + k), Y(o.bands[k][loL]));
-  ctx.closePath();
-  ctx.fill();
+  ctx.moveTo(X(ax), Y(ay));
+  for (let k = 0; k < xs.length; k++) ctx.lineTo(X(xs[k]), Y(bands[k][L.P50]));
+  ctx.stroke();
+  ctx.setLineDash([]);
+  // half-width of the 80% band at the tip, as % of the current price
+  const tip = bands[xs.length - 1];
+  const half = (tip[L.P90] - tip[L.P10]) / 2 / ay;
+  const tx = X(xs[xs.length - 1]) + 8;
+  ctx.font = "600 12px ui-sans-serif, system-ui, sans-serif";
+  ctx.textAlign = "left";
+  ctx.textBaseline = "middle";
+  ctx.fillStyle = "rgba(74,163,255,0.95)";
+  ctx.fillText(`±${(half * 100).toFixed(2)}%`, tx, Y(tip[L.P50]));
 }
 
 function drawHud(w, h, plot) {
@@ -531,7 +630,7 @@ function drawHud(w, h, plot) {
   ctx.font = "13px ui-sans-serif, system-ui, sans-serif";
   const modelName = d.model.split("/").pop();
   ctx.fillText(
-    `${modelName} · walk-forward, ${d.H}-bar horizon, ${d.params.stride}-bar stride, ${d.params.context}-bar context`,
+    `${modelName} · walk-forward, ${d.H}-bar horizon, ${d.params.stride === 1 ? "re-forecast every bar" : `${d.params.stride}-bar stride`}, ${d.params.context}-bar context`,
     16, 54,
   );
 
@@ -574,7 +673,9 @@ function drawHud(w, h, plot) {
   item((x0, y) => { ctx.strokeStyle = COLORS.median; ctx.lineWidth = 2; ctx.setLineDash([5, 3]); ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x0 + 16, y); ctx.stroke(); ctx.setLineDash([]); }, "median");
   item((x0, y) => { ctx.fillStyle = COLORS.band80; ctx.fillRect(x0, y - 5, 16, 10); }, "80% band");
   item((x0, y) => { ctx.fillStyle = COLORS.band90; ctx.fillRect(x0, y - 5, 16, 10); }, "90% band");
-  item((x0, y) => { ctx.fillStyle = COLORS.bad; ctx.beginPath(); ctx.arc(x0 + 8, y, 4, 0, Math.PI * 2); ctx.fill(); }, "outside band");
+  item((x0, y) => { ctx.strokeStyle = COLORS.future; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x0 + 16, y); ctx.stroke(); }, "price ahead");
+  item((x0, y) => { ctx.fillStyle = COLORS.bad; ctx.beginPath(); ctx.arc(x0 + 8, y, 4, 0, Math.PI * 2); ctx.fill(); }, "left its band");
+  item((x0, y) => { ctx.strokeStyle = COLORS.bad; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(x0 + 8, y, 4, 0, Math.PI * 2); ctx.stroke(); }, "leaves the cone");
   ctx.textAlign = "right";
   ctx.fillStyle = COLORS.muted;
   ctx.fillText("coinband · unofficial, not affiliated with Mistral AI or Binance · not financial advice", w - 16, ly);

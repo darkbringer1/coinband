@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "coinband"
+version = "0.1.0"
+description = "Backtest Mistral's Timestral forecasts on any Binance coin and watch the band play out"
+readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+requires-python = ">=3.10"
+dependencies = [
+    # Pinned to the upstream release commit; bump deliberately.
+    "timestral @ git+https://github.com/mistralai/timestral.git@a534bdbd244d64f3d9d743f46c7bf6fc330ed4ff",
+]
+
+[project.scripts]
+coinband = "coinband.server:main"
+
+[dependency-groups]
+dev = ["pytest>=8"]
+
+[tool.setuptools.packages.find]
+include = ["coinband*"]
+
+[tool.setuptools.package-data]
+coinband = ["static/*"]
+
+[tool.ruff]
+line-length = 120

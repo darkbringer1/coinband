@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 394" width="960" height="394" font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif" font-size="12">
+<rect width="960" height="394" fill="#fcfcfb"/>
+<text x="24" y="28" font-size="15" font-weight="600" fill="#1a1a19">Timestral against GARCH, the standard risk model, in four markets</text>
+<text x="24" y="46" fill="#52514e">CRPS skill vs GARCH (whole forecast distribution), average over the horizon, with 90% intervals. Right of 0: better than GARCH.</text>
+<text x="300" y="84" font-weight="600" fill="#1a1a19">Timestral alone</text>
+<line x1="313.5" y1="102" x2="313.5" y2="304" stroke="#e4e3df"/>
+<text x="313.5" y="322" text-anchor="middle" fill="#52514e">-0.5%</text>
+<line x1="381.0" y1="102" x2="381.0" y2="304" stroke="#e4e3df"/>
+<text x="381.0" y="322" text-anchor="middle" fill="#52514e">+0.0%</text>
+<line x1="448.5" y1="102" x2="448.5" y2="304" stroke="#e4e3df"/>
+<text x="448.5" y="322" text-anchor="middle" fill="#52514e">+0.5%</text>
+<line x1="516.0" y1="102" x2="516.0" y2="304" stroke="#e4e3df"/>
+<text x="516.0" y="322" text-anchor="middle" fill="#52514e">+1.0%</text>
+<line x1="381.0" y1="102" x2="381.0" y2="304" stroke="#1a1a19" stroke-width="1.5"/>
+<text x="280" y="122" text-anchor="end" fill="#1a1a19">Crypto, hourly (part 2)</text>
+<line x1="374.7" y1="111" x2="448.3" y2="111" stroke="#eb6834" stroke-width="2"/>
+<circle cx="412.8" cy="111" r="5" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"/>
+<line x1="434.7" y1="125" x2="517.5" y2="125" stroke="#2a78d6" stroke-width="2"/>
+<circle cx="474.4" cy="125" r="5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<text x="280" y="172" text-anchor="end" fill="#1a1a19">FX and gold, hourly</text>
+<line x1="309.5" y1="161" x2="395.0" y2="161" stroke="#eb6834" stroke-width="2"/>
+<circle cx="354.9" cy="161" r="5" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"/>
+<line x1="427.3" y1="175" x2="524.7" y2="175" stroke="#2a78d6" stroke-width="2"/>
+<circle cx="477.1" cy="175" r="5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<text x="280" y="222" text-anchor="end" fill="#1a1a19">Stocks and indices, hourly</text>
+<line x1="376.3" y1="211" x2="439.2" y2="211" stroke="#eb6834" stroke-width="2"/>
+<circle cx="411.1" cy="211" r="5" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"/>
+<line x1="479.8" y1="225" x2="550.1" y2="225" stroke="#2a78d6" stroke-width="2"/>
+<circle cx="511.7" cy="225" r="5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<text x="280" y="272" text-anchor="end" fill="#1a1a19">Everything, daily</text>
+<line x1="345.0" y1="261" x2="425.8" y2="261" stroke="#eb6834" stroke-width="2"/>
+<circle cx="384.7" cy="261" r="5" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"/>
+<line x1="330.2" y1="275" x2="446.1" y2="275" stroke="#2a78d6" stroke-width="2"/>
+<circle cx="391.3" cy="275" r="5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<text x="640" y="84" font-weight="600" fill="#1a1a19">Blend (Timestral + GARCH)</text>
+<line x1="653.5" y1="102" x2="653.5" y2="304" stroke="#e4e3df"/>
+<text x="653.5" y="322" text-anchor="middle" fill="#52514e">-0.5%</text>
+<line x1="721.0" y1="102" x2="721.0" y2="304" stroke="#e4e3df"/>
+<text x="721.0" y="322" text-anchor="middle" fill="#52514e">+0.0%</text>
+<line x1="788.5" y1="102" x2="788.5" y2="304" stroke="#e4e3df"/>
+<text x="788.5" y="322" text-anchor="middle" fill="#52514e">+0.5%</text>
+<line x1="856.0" y1="102" x2="856.0" y2="304" stroke="#e4e3df"/>
+<text x="856.0" y="322" text-anchor="middle" fill="#52514e">+1.0%</text>
+<line x1="721.0" y1="102" x2="721.0" y2="304" stroke="#1a1a19" stroke-width="1.5"/>
+<line x1="759.3" y1="111" x2="798.9" y2="111" stroke="#eb6834" stroke-width="2"/>
+<circle cx="777.6" cy="111" r="5" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"/>
+<line x1="786.0" y1="125" x2="826.8" y2="125" stroke="#2a78d6" stroke-width="2"/>
+<circle cx="804.5" cy="125" r="5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<line x1="705.3" y1="161" x2="746.9" y2="161" stroke="#eb6834" stroke-width="2"/>
+<circle cx="727.8" cy="161" r="5" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"/>
+<line x1="780.5" y1="175" x2="831.2" y2="175" stroke="#2a78d6" stroke-width="2"/>
+<circle cx="805.6" cy="175" r="5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<line x1="755.2" y1="211" x2="786.2" y2="211" stroke="#eb6834" stroke-width="2"/>
+<circle cx="772.1" cy="211" r="5" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"/>
+<line x1="824.3" y1="225" x2="858.4" y2="225" stroke="#2a78d6" stroke-width="2"/>
+<circle cx="839.4" cy="225" r="5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<line x1="739.7" y1="261" x2="776.3" y2="261" stroke="#eb6834" stroke-width="2"/>
+<circle cx="756.3" cy="261" r="5" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"/>
+<line x1="727.0" y1="275" x2="783.1" y2="275" stroke="#2a78d6" stroke-width="2"/>
+<circle cx="756.2" cy="275" r="5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="300" cy="354" r="5" fill="#eb6834"/>
+<text x="310" y="358" fill="#1a1a19">Tuning half (GARCH fitted here)</text>
+<circle cx="600" cy="354" r="5" fill="#2a78d6"/>
+<text x="610" y="358" fill="#1a1a19">Held-out half</text>
+</svg>

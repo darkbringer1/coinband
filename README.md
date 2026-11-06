@@ -5,7 +5,7 @@ Binance coin (or stock, index, FX pair), then watch its forecast band play out a
 
 > Unofficial. Not affiliated with Mistral AI or Binance. Not financial advice.
 
-- **Read the study:** <https://darkbringer1.github.io/coinband/> (three parts, written for general readers)
+- **Read the study:** <https://darkbringer1.github.io/coinband/> (four parts, written for general readers)
 - **Try the demo in your browser:** <https://darkbringer1.github.io/coinband/demo/> (no install, precomputed runs)
 - **Check the results yourself:** <https://darkbringer1.github.io/coinband/lab/> (Timestral vs GARCH risk lines and
   volatility forecasts, hour by hour)
@@ -76,7 +76,7 @@ come from the study.
 
 ## The study
 
-Three write-ups in `docs/`, each with a plain-language layer and collapsible expert sections. Every number comes
+Four write-ups in `docs/`, each with a plain-language layer and collapsible expert sections. Every number comes
 from a script in `experiments/`.
 
 | Part | Question | Source | Scripts |
@@ -84,6 +84,7 @@ from a script in `experiments/`.
 | 1 | How good are the forecasts, and which settings are best? | [docs/paper.md](docs/paper.md) | `experiments/sweep.py`, `analyze.py`, `effects.py`, `figures.py` |
 | 2 | Is it a better risk model than GARCH? VaR, sizing, direction | [docs/risk.md](docs/risk.md) | `experiments/phase1/` |
 | 3 | Do extra inputs help? How does it compare to the options market (Deribit DVOL)? | [docs/options.md](docs/options.md) | `experiments/phase2/`, `experiments/phase3/` |
+| 4 | Does it carry over to stocks, indices, FX and gold? Risk vs GARCH, and vs the VIX | [docs/markets.md](docs/markets.md) | `experiments/phase4/` |
 
 Each document ends with a "Check it yourself" section listing the exact commands. Part 1 takes about half an
 hour on an Apple-silicon GPU, several hours on CPU. Caches and results land in `experiments/cache/` and
@@ -142,7 +143,7 @@ Ground rules (the full list is in [CLAUDE.md](CLAUDE.md)):
 
 `docs/` is the site, served from the `main` branch, `/docs` folder:
 
-- `docs/index.html`, `docs/risk/`, `docs/options/`: the three parts, rendered from the `.md` files
+- `docs/index.html`, `docs/risk/`, `docs/options/`, `docs/markets/`: the four parts, rendered from the `.md` files
 - `docs/demo/`: a copy of `coinband/static` in static mode, replaying precomputed Timestral-209M runs for eight
   Binance coins from `docs/demo/data/`
 - `docs/lab/`: the hand-written Lab page (`index.html`, `lab.js`, `lab.css`, edit these directly); its data in

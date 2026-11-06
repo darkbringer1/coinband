@@ -210,6 +210,11 @@ uv run python experiments/phase3/options.py                       # fetches DVOL
 uv run python experiments/phase3/figures.py
 ```
 
+## Next
+
+[Part 4: Beyond crypto: stocks, currencies, gold, and a match against the VIX](markets.md) repeats the accuracy,
+risk and options tests on sixteen traditional markets.
+
 ## Words used here
 
 - **Covariate**: an extra time series given to the model alongside the price.

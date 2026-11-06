@@ -508,7 +508,7 @@ def make_handler(app: App):
                     self._json(job.snapshot())
             elif path.startswith("/api/"):
                 self._error(HTTPStatus.NOT_FOUND, "not found")
-            elif path.rstrip("/") in ("/paper", "/paper/risk", "/paper/options"):
+            elif path.rstrip("/") in ("/paper", "/paper/risk", "/paper/options", "/paper/markets"):
                 from coinband.paper import paper_html
 
                 page = paper_html(path.rstrip("/").split("/")[-1] if path.rstrip("/") != "/paper" else "paper")

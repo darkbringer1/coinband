@@ -1,0 +1,113 @@
+{
+ "generated": "2026-11-06",
+ "model": "mistralai/Timestral-209M",
+ "model_name": "Timestral-209M",
+ "horizon": 24,
+ "days": 30,
+ "runs": [
+  {
+   "symbol": "DOGEUSDT",
+   "file": "data/DOGEUSDT.json",
+   "summary": {
+    "crps_skill": 0.027243273319758066,
+    "skill": 0.0035419129938829563,
+    "coverage": 0.7902298850574708,
+    "calibration_error": 0.0197700009122423,
+    "direction_hit_rate": 0.5660919540229885,
+    "scored": 696
+   },
+   "live_change": -0.0017784480394844593
+  },
+  {
+   "symbol": "ADAUSDT",
+   "file": "data/ADAUSDT.json",
+   "summary": {
+    "crps_skill": 0.02462744006839046,
+    "skill": 0.008056085430738213,
+    "coverage": 0.7851412835249043,
+    "calibration_error": 0.043608032293377126,
+    "direction_hit_rate": 0.6135057471264368,
+    "scored": 696
+   },
+   "live_change": -0.0022425531914893604
+  },
+  {
+   "symbol": "XRPUSDT",
+   "file": "data/XRPUSDT.json",
+   "summary": {
+    "crps_skill": 0.021754965511921465,
+    "skill": 0.0022229249930405537,
+    "coverage": 0.7978927203065126,
+    "calibration_error": 0.016757890895821925,
+    "direction_hit_rate": 0.5330459770114943,
+    "scored": 696
+   },
+   "live_change": -0.0009077882670263104
+  },
+  {
+   "symbol": "BTCUSDT",
+   "file": "data/BTCUSDT.json",
+   "summary": {
+    "crps_skill": 0.016516085137355585,
+    "skill": 0.0005554681489078339,
+    "coverage": 0.7865181992337155,
+    "calibration_error": 0.012367724867724866,
+    "direction_hit_rate": 0.5057471264367817,
+    "scored": 696
+   },
+   "live_change": 0.00018982443093373824
+  },
+  {
+   "symbol": "SOLUSDT",
+   "file": "data/SOLUSDT.json",
+   "summary": {
+    "crps_skill": 0.013695762325092398,
+    "skill": 0.0047248156656132245,
+    "coverage": 0.7986111111111107,
+    "calibration_error": 0.04672390987046159,
+    "direction_hit_rate": 0.6005747126436781,
+    "scored": 696
+   },
+   "live_change": -0.0006789757116166806
+  },
+  {
+   "symbol": "BNBUSDT",
+   "file": "data/BNBUSDT.json",
+   "summary": {
+    "crps_skill": 0.00973571584028865,
+    "skill": -0.00037192811335962084,
+    "coverage": 0.772270114942529,
+    "calibration_error": 0.01575043331508849,
+    "direction_hit_rate": 0.5114942528735632,
+    "scored": 696
+   },
+   "live_change": -0.0005503691149857382
+  },
+  {
+   "symbol": "ETHUSDT",
+   "file": "data/ETHUSDT.json",
+   "summary": {
+    "crps_skill": 0.00921878283693578,
+    "skill": -0.0007543510936283138,
+    "coverage": 0.7611350574712632,
+    "calibration_error": 0.01911124794745483,
+    "direction_hit_rate": 0.49137931034482757,
+    "scored": 696
+   },
+   "live_change": 0.000634461963691324
+  },
+  {
+   "symbol": "LINKUSDT",
+   "file": "data/LINKUSDT.json",
+   "summary": {
+    "crps_skill": 0.009021545415067056,
+    "skill": 0.004424316995495392,
+    "coverage": 0.7578424329501908,
+    "calibration_error": 0.03366459131545338,
+    "direction_hit_rate": 0.5560344827586207,
+    "scored": 696
+   },
+   "live_change": -0.0006197440585008485
+  }
+ ]
+}

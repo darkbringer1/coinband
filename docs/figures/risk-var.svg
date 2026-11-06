@@ -1,0 +1,81 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 316" width="980" height="316" font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif" font-size="12">
+<rect width="980" height="316" fill="#fcfcfb"/>
+<text x="24" y="28" font-size="15" font-weight="600" fill="#1a1a19">Value-at-Risk calibration, 1 hour ahead, held-out half</text>
+<text x="24" y="46" fill="#52514e">How often the price fell below each model's 1% and 5% line. On the target line is right; the count is how many of 8 pairs the Kupiec test rejects.</text>
+<text x="150" y="76" font-weight="600" fill="#1a1a19">1% line (worst hour in a hundred)</text>
+<line x1="150.0" y1="90" x2="150.0" y2="290" stroke="#e4e3df"/>
+<text x="150.0" y="306" text-anchor="middle" fill="#52514e">0.0%</text>
+<line x1="196.0" y1="90" x2="196.0" y2="290" stroke="#e4e3df"/>
+<text x="196.0" y="306" text-anchor="middle" fill="#52514e">0.5%</text>
+<line x1="242.0" y1="90" x2="242.0" y2="290" stroke="#e4e3df"/>
+<text x="242.0" y="306" text-anchor="middle" fill="#52514e">1.0%</text>
+<line x1="288.0" y1="90" x2="288.0" y2="290" stroke="#e4e3df"/>
+<text x="288.0" y="306" text-anchor="middle" fill="#52514e">1.5%</text>
+<line x1="334.0" y1="90" x2="334.0" y2="290" stroke="#e4e3df"/>
+<text x="334.0" y="306" text-anchor="middle" fill="#52514e">2.0%</text>
+<line x1="380.0" y1="90" x2="380.0" y2="290" stroke="#e4e3df"/>
+<text x="380.0" y="306" text-anchor="middle" fill="#52514e">2.5%</text>
+<line x1="242.0" y1="86" x2="242.0" y2="294" stroke="#1a1a19" stroke-width="1.5" stroke-dasharray="5 3"/>
+<text x="246.0" y="88" fill="#1a1a19">target</text>
+<text x="134" y="108" text-anchor="end" fill="#1a1a19">Timestral</text>
+<line x1="242.0" y1="104" x2="245.0" y2="104" stroke="#2a78d6" stroke-opacity="0.35" stroke-width="3"/>
+<circle cx="245.0" cy="104" r="5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<text x="390" y="108" fill="#52514e">1.03% · 0/8 rejected</text>
+<text x="134" y="142" text-anchor="end" fill="#1a1a19">Blend</text>
+<line x1="242.0" y1="138" x2="226.1" y2="138" stroke="#2a78d6" stroke-opacity="0.35" stroke-width="3"/>
+<circle cx="226.1" cy="138" r="5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<text x="390" y="142" fill="#52514e">0.83% · 2/8 rejected</text>
+<text x="134" y="176" text-anchor="end" fill="#1a1a19">GARCH</text>
+<line x1="242.0" y1="172" x2="221.0" y2="172" stroke="#52514e" stroke-opacity="0.35" stroke-width="3"/>
+<circle cx="221.0" cy="172" r="5" fill="#52514e" stroke="#fcfcfb" stroke-width="2"/>
+<text x="390" y="176" fill="#52514e">0.77% · 3/8 rejected</text>
+<text x="134" y="210" text-anchor="end" fill="#1a1a19">EWMA</text>
+<line x1="242.0" y1="206" x2="245.7" y2="206" stroke="#52514e" stroke-opacity="0.35" stroke-width="3"/>
+<circle cx="245.7" cy="206" r="5" fill="#52514e" stroke="#fcfcfb" stroke-width="2"/>
+<text x="390" y="210" fill="#52514e">1.04% · 0/8 rejected</text>
+<text x="134" y="244" text-anchor="end" fill="#1a1a19">Historical sim.</text>
+<line x1="242.0" y1="240" x2="253.9" y2="240" stroke="#52514e" stroke-opacity="0.35" stroke-width="3"/>
+<circle cx="253.9" cy="240" r="5" fill="#52514e" stroke="#fcfcfb" stroke-width="2"/>
+<text x="390" y="244" fill="#52514e">1.13% · 1/8 rejected</text>
+<text x="134" y="278" text-anchor="end" fill="#1a1a19">Random walk</text>
+<line x1="242.0" y1="274" x2="323.1" y2="274" stroke="#52514e" stroke-opacity="0.35" stroke-width="3"/>
+<circle cx="323.1" cy="274" r="5" fill="#52514e" stroke="#fcfcfb" stroke-width="2"/>
+<text x="390" y="278" fill="#52514e">1.88% · 8/8 rejected</text>
+<text x="570" y="76" font-weight="600" fill="#1a1a19">5% line (worst hour in twenty)</text>
+<line x1="570.0" y1="90" x2="570.0" y2="290" stroke="#e4e3df"/>
+<text x="570.0" y="306" text-anchor="middle" fill="#52514e">3.0%</text>
+<line x1="602.9" y1="90" x2="602.9" y2="290" stroke="#e4e3df"/>
+<text x="602.9" y="306" text-anchor="middle" fill="#52514e">3.5%</text>
+<line x1="635.7" y1="90" x2="635.7" y2="290" stroke="#e4e3df"/>
+<text x="635.7" y="306" text-anchor="middle" fill="#52514e">4.0%</text>
+<line x1="668.6" y1="90" x2="668.6" y2="290" stroke="#e4e3df"/>
+<text x="668.6" y="306" text-anchor="middle" fill="#52514e">4.5%</text>
+<line x1="701.4" y1="90" x2="701.4" y2="290" stroke="#e4e3df"/>
+<text x="701.4" y="306" text-anchor="middle" fill="#52514e">5.0%</text>
+<line x1="734.3" y1="90" x2="734.3" y2="290" stroke="#e4e3df"/>
+<text x="734.3" y="306" text-anchor="middle" fill="#52514e">5.5%</text>
+<line x1="767.1" y1="90" x2="767.1" y2="290" stroke="#e4e3df"/>
+<text x="767.1" y="306" text-anchor="middle" fill="#52514e">6.0%</text>
+<line x1="800.0" y1="90" x2="800.0" y2="290" stroke="#e4e3df"/>
+<text x="800.0" y="306" text-anchor="middle" fill="#52514e">6.5%</text>
+<line x1="701.4" y1="86" x2="701.4" y2="294" stroke="#1a1a19" stroke-width="1.5" stroke-dasharray="5 3"/>
+<text x="705.4" y="88" fill="#1a1a19">target</text>
+<line x1="701.4" y1="104" x2="720.0" y2="104" stroke="#2a78d6" stroke-opacity="0.35" stroke-width="3"/>
+<circle cx="720.0" cy="104" r="5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<text x="810" y="108" fill="#52514e">5.28% · 1/8 rejected</text>
+<line x1="701.4" y1="138" x2="652.7" y2="138" stroke="#2a78d6" stroke-opacity="0.35" stroke-width="3"/>
+<circle cx="652.7" cy="138" r="5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<text x="810" y="142" fill="#52514e">4.26% · 6/8 rejected</text>
+<line x1="701.4" y1="172" x2="620.0" y2="172" stroke="#52514e" stroke-opacity="0.35" stroke-width="3"/>
+<circle cx="620.0" cy="172" r="5" fill="#52514e" stroke="#fcfcfb" stroke-width="2"/>
+<text x="810" y="176" fill="#52514e">3.76% · 8/8 rejected</text>
+<line x1="701.4" y1="206" x2="691.5" y2="206" stroke="#52514e" stroke-opacity="0.35" stroke-width="3"/>
+<circle cx="691.5" cy="206" r="5" fill="#52514e" stroke="#fcfcfb" stroke-width="2"/>
+<text x="810" y="210" fill="#52514e">4.85% · 0/8 rejected</text>
+<line x1="701.4" y1="240" x2="719.1" y2="240" stroke="#52514e" stroke-opacity="0.35" stroke-width="3"/>
+<circle cx="719.1" cy="240" r="5" fill="#52514e" stroke="#fcfcfb" stroke-width="2"/>
+<text x="810" y="244" fill="#52514e">5.27% · 1/8 rejected</text>
+<line x1="701.4" y1="274" x2="647.6" y2="274" stroke="#52514e" stroke-opacity="0.35" stroke-width="3"/>
+<circle cx="647.6" cy="274" r="5" fill="#52514e" stroke="#fcfcfb" stroke-width="2"/>
+<text x="810" y="278" fill="#52514e">4.18% · 7/8 rejected</text>
+</svg>

@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 380" width="980" height="380" font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif" font-size="12">
+<rect width="980" height="380" fill="#fcfcfb"/>
+<text x="24" y="28" font-size="15" font-weight="600" fill="#1a1a19">CRPS skill vs GARCH(1,1), by hours ahead</text>
+<text x="24" y="46" fill="#52514e">Eight Binance pairs, a new forecast every hour, ~4,500 per pair and period. Above 0: better than GARCH.</text>
+<text x="70" y="76" font-weight="600" fill="#1a1a19">Tuning half, Oct 2025 to May 2026</text>
+<line x1="70" y1="296.4" x2="320" y2="296.4" stroke="#e4e3df"/>
+<text x="62" y="300.4" text-anchor="end" fill="#52514e">-1.0%</text>
+<line x1="70" y1="247.5" x2="320" y2="247.5" stroke="#e4e3df"/>
+<text x="62" y="251.5" text-anchor="end" fill="#52514e">-0.5%</text>
+<line x1="70" y1="198.6" x2="320" y2="198.6" stroke="#e4e3df"/>
+<text x="62" y="202.6" text-anchor="end" fill="#52514e">+0.0%</text>
+<line x1="70" y1="149.7" x2="320" y2="149.7" stroke="#e4e3df"/>
+<text x="62" y="153.7" text-anchor="end" fill="#52514e">+0.5%</text>
+<line x1="70" y1="100.8" x2="320" y2="100.8" stroke="#e4e3df"/>
+<text x="62" y="104.8" text-anchor="end" fill="#52514e">+1.0%</text>
+<line x1="70" y1="198.6" x2="320" y2="198.6" stroke="#52514e" stroke-dasharray="4 4"/>
+<text x="74" y="213.6" fill="#52514e">GARCH = 0</text>
+<text x="70.0" y="334" text-anchor="middle" fill="#52514e">1</text>
+<text x="124.3" y="334" text-anchor="middle" fill="#52514e">6</text>
+<text x="189.6" y="334" text-anchor="middle" fill="#52514e">12</text>
+<text x="254.8" y="334" text-anchor="middle" fill="#52514e">18</text>
+<text x="320.0" y="334" text-anchor="middle" fill="#52514e">24</text>
+<text x="320" y="350" text-anchor="end" fill="#52514e">hours ahead</text>
+<polyline points="70.0,259.5 80.9,211.5 91.7,188.4 102.6,187.4 113.5,174.2 124.3,163.4 135.2,167.0 146.1,159.1 157.0,158.9 167.8,164.6 178.7,166.9 189.6,167.7 200.4,170.0 211.3,174.9 222.2,174.5 233.0,172.2 243.9,173.5 254.8,173.9 265.7,172.6 276.5,176.8 287.4,179.5 298.3,183.0 309.1,183.1 320.0,185.6" fill="none" stroke="#2a78d6" stroke-width="2" stroke-linejoin="round"/>
+<polyline points="70.0,176.7 80.9,169.2 91.7,165.7 102.6,166.2 113.5,162.0 124.3,158.0 135.2,158.9 146.1,155.6 157.0,154.2 167.8,156.3 178.7,157.3 189.6,156.2 200.4,156.8 211.3,155.5 222.2,158.8 233.0,156.7 243.9,157.0 254.8,155.8 265.7,154.7 276.5,155.8 287.4,155.1 298.3,156.7 309.1,157.8 320.0,158.8" fill="none" stroke="#eb6834" stroke-width="2" stroke-linejoin="round"/>
+<circle cx="328" cy="158.8" r="3" fill="#eb6834"/>
+<text x="334" y="162.8" fill="#1a1a19">Blend (Timestral + GARCH)</text>
+<circle cx="328" cy="185.6" r="3" fill="#2a78d6"/>
+<text x="334" y="189.6" fill="#1a1a19">Timestral</text>
+<text x="540" y="76" font-weight="600" fill="#1a1a19">Held-out half, May to Nov 2026</text>
+<line x1="540" y1="296.4" x2="790" y2="296.4" stroke="#e4e3df"/>
+<text x="532" y="300.4" text-anchor="end" fill="#52514e">-1.0%</text>
+<line x1="540" y1="247.5" x2="790" y2="247.5" stroke="#e4e3df"/>
+<text x="532" y="251.5" text-anchor="end" fill="#52514e">-0.5%</text>
+<line x1="540" y1="198.6" x2="790" y2="198.6" stroke="#e4e3df"/>
+<text x="532" y="202.6" text-anchor="end" fill="#52514e">+0.0%</text>
+<line x1="540" y1="149.7" x2="790" y2="149.7" stroke="#e4e3df"/>
+<text x="532" y="153.7" text-anchor="end" fill="#52514e">+0.5%</text>
+<line x1="540" y1="100.8" x2="790" y2="100.8" stroke="#e4e3df"/>
+<text x="532" y="104.8" text-anchor="end" fill="#52514e">+1.0%</text>
+<line x1="540" y1="198.6" x2="790" y2="198.6" stroke="#52514e" stroke-dasharray="4 4"/>
+<text x="544" y="213.6" fill="#52514e">GARCH = 0</text>
+<text x="540.0" y="334" text-anchor="middle" fill="#52514e">1</text>
+<text x="594.3" y="334" text-anchor="middle" fill="#52514e">6</text>
+<text x="659.6" y="334" text-anchor="middle" fill="#52514e">12</text>
+<text x="724.8" y="334" text-anchor="middle" fill="#52514e">18</text>
+<text x="790.0" y="334" text-anchor="middle" fill="#52514e">24</text>
+<text x="790" y="350" text-anchor="end" fill="#52514e">hours ahead</text>
+<polyline points="540.0,172.0 550.9,147.2 561.7,131.9 572.6,131.6 583.5,128.8 594.3,123.4 605.2,123.1 616.1,121.3 627.0,121.8 637.8,122.5 648.7,122.6 659.6,127.0 670.4,128.1 681.3,136.4 692.2,128.7 703.0,129.4 713.9,128.6 724.8,131.8 735.7,133.9 746.5,133.7 757.4,137.2 768.3,136.7 779.1,134.1 790.0,134.4" fill="none" stroke="#2a78d6" stroke-width="2" stroke-linejoin="round"/>
+<polyline points="540.0,143.5 550.9,141.0 561.7,136.9 572.6,136.9 583.5,135.0 594.3,133.6 605.2,134.5 616.1,133.8 627.0,133.8 637.8,134.9 648.7,135.2 659.6,137.5 670.4,137.4 681.3,140.8 692.2,137.6 703.0,137.7 713.9,137.9 724.8,139.4 735.7,140.3 746.5,139.8 757.4,141.4 768.3,141.3 779.1,139.7 790.0,139.7" fill="none" stroke="#eb6834" stroke-width="2" stroke-linejoin="round"/>
+<circle cx="798" cy="134.4" r="3" fill="#2a78d6"/>
+<text x="804" y="138.4" fill="#1a1a19">Timestral</text>
+<circle cx="798" cy="149.7" r="3" fill="#eb6834"/>
+<text x="804" y="153.7" fill="#1a1a19">Blend (Timestral + GARCH)</text>
+</svg>

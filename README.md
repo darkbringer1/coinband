@@ -7,7 +7,9 @@ Binance coin, and watch the forecast band play out against the real price.
 
 ## What it does
 
-- Pulls candles for any Binance spot pair (public market-data API, no key).
+- Pulls candles for any Binance spot pair (public market-data API, no key), or for stocks, indices, FX and
+  futures from Yahoo Finance (Nasdaq, BIST, S&P 500, DAX, gold, USD/TRY, ...). Yahoo's endpoint is unofficial and
+  its terms restrict redistribution, so its data stays in your local cache (`~/.cache/coinband`).
 - Runs a walk-forward backtest: at each forecast origin, Timestral sees only the past and forecasts the next
   `horizon` bars as quantiles.
 - Animates the run in a browser: a forecast cone (P05 to P95, median dashed) slides along the full real price
@@ -20,6 +22,10 @@ uv sync
 uv run coinband          # http://127.0.0.1:8000  (--port, --host, --device auto|cpu|cuda|mps)
 uv run pytest
 ```
+
+Fetched bars are cached locally and only new bars are fetched on later runs. **Live** (next to the playback
+controls) refreshes every 60 s: new closed bars, a fresh live forecast and the current price against the cone.
+The study behind the defaults is served at `/paper`.
 
 The first run of each model downloads its weights from the Hugging Face Hub (21 MB for Timestral-5M, 837 MB for
 Timestral-209M). Links like `http://127.0.0.1:8000/#symbol=ETHUSDT&interval=4h&horizon=12&run` fill the form and
@@ -51,6 +57,14 @@ pairs with a held-out period: see [docs/paper.md](docs/paper.md). In short, the 
 `experiments/`.
 
 The **leaderboard** runs the same settings on several pairs and ranks them; click a row to replay it.
+
+## Website
+
+`docs/` is a GitHub Pages site: the article (`docs/index.html`, rendered from `docs/paper.md`) and an in-browser
+demo (`docs/demo/`) that replays precomputed Timestral-209M backtests for eight coins, no server needed. Rebuild it
+with `uv run python experiments/build_site.py --device mps` (`--pages-only` to re-render without forecasting),
+then serve `docs/` with Pages (Settings > Pages > main, /docs). Only Binance data is published; Yahoo data stays
+local.
 
 ## License
 

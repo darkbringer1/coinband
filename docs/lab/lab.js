@@ -83,7 +83,9 @@ const sw = (c) => `<span class="sw" style="background:${c}"></span>`;
 
 // ---------------------------------------------------------------- 1. risk lines
 
-const risk = { pair: null, level: "01", win: 168, end: 1, playing: false, data: null, hover: null };
+// playback: 1x advances 4 hours per second; 2x, 4x and 8x multiply that
+const BASE_HOURS_PER_SECOND = 4;
+const risk = { pair: null, level: "01", win: 168, end: 1, playing: false, data: null, hover: null, speed: 1, pos: 1, lastTs: 0 };
 
 function riskStats(d, a, b, level) {
   const p = level === "01" ? 0.01 : 0.05;
@@ -215,16 +217,23 @@ async function setRiskPair(p) {
   risk.pair = p;
   risk.data = await load(`risk-${p}.json`);
   risk.end = risk.data.close.length - 1;
+  risk.pos = risk.end;
   $("risk-scrub").value = 1000;
   drawRisk();
 }
 
-function riskFrame() {
+function riskFrame(ts) {
   if (!risk.playing || !risk.data) return;
   const n = risk.data.close.length;
-  risk.end = Math.min(n - 1, risk.end + Math.max(1, Math.round(risk.win / 120)));
-  $("risk-scrub").value = Math.round((risk.end / (n - 1)) * 1000);
-  drawRisk();
+  const dt = risk.lastTs ? Math.min(0.1, (ts - risk.lastTs) / 1000) : 0;
+  risk.lastTs = ts;
+  risk.pos = Math.min(n - 1, risk.pos + dt * BASE_HOURS_PER_SECOND * risk.speed);
+  const next = Math.floor(risk.pos);
+  if (next !== risk.end) {
+    risk.end = next;
+    $("risk-scrub").value = Math.round((risk.end / (n - 1)) * 1000);
+    drawRisk();
+  }
   if (risk.end >= n - 1) { risk.playing = false; $("risk-play").textContent = "Play"; return; }
   requestAnimationFrame(riskFrame);
 }
@@ -386,6 +395,7 @@ function cards(idx) {
   $("risk-scrub").addEventListener("input", (e) => {
     const n = risk.data.close.length;
     risk.end = Math.max(1, Math.round((Number(e.target.value) / 1000) * (n - 1)));
+    risk.pos = risk.end;
     risk.playing = false;
     $("risk-play").textContent = "Play";
     drawRisk();
@@ -395,8 +405,16 @@ function cards(idx) {
     $("risk-play").textContent = risk.playing ? "Pause" : "Play";
     if (risk.playing) {
       if (risk.end >= risk.data.close.length - 1) risk.end = Math.min(risk.win, risk.data.close.length - 1);
+      risk.pos = risk.end;
+      risk.lastTs = 0;
       requestAnimationFrame(riskFrame);
     }
+  });
+  $("risk-speed").addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-speed]");
+    if (!b) return;
+    risk.speed = Number(b.dataset.speed);
+    for (const x of $("risk-speed").querySelectorAll("button")) x.classList.toggle("on", x === b);
   });
   $("risk-chart").addEventListener("mousemove", riskHover);
   $("risk-chart").addEventListener("mouseleave", (e) => { risk.hover = null; tooltip(e.target, null); drawRisk(); });

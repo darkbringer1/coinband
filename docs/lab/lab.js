@@ -112,7 +112,11 @@ function drawRisk() {
   const P = { l: 70, r: w - 86, t: 16, b: h - 26 };
   const n = d.close.length;
   const end = Math.max(1, Math.min(n - 1, risk.end));
-  const a = Math.max(0, end - risk.win + 1);
+  // while playing the window glides: its right edge follows the fractional position, not whole hours
+  const right = risk.playing ? Math.min(n - 1 + 0.999, risk.pos) + 1 : end + 1;
+  const width = Math.min(risk.win, right);
+  const left = right - width;
+  const a = Math.max(0, Math.floor(left));
   const t = (k) => d["t" + risk.level][k], g = (k) => d["g" + risk.level][k];
   let lo = Infinity, hi = -Infinity;
   for (let i = a; i <= end; i++) {
@@ -121,11 +125,23 @@ function drawRisk() {
   }
   const padY = (hi - lo) * 0.08 || hi * 0.01;
   lo -= padY; hi += padY;
-  const X = (i) => P.l + ((i - a + 0.5) / (end - a + 1)) * (P.r - P.l);
+  // ease the price scale toward its new range while playing, so it never snaps
+  if (risk.playing && risk.cam) {
+    risk.cam.lo += (lo - risk.cam.lo) * 0.08;
+    risk.cam.hi += (hi - risk.cam.hi) * 0.08;
+    lo = risk.cam.lo; hi = risk.cam.hi;
+  } else {
+    risk.cam = { lo, hi };
+  }
+  const X = (i) => P.l + ((i + 0.5 - left) / width) * (P.r - P.l);
   const Y = (v) => P.b - ((v - lo) / (hi - lo)) * (P.b - P.t);
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(P.l, 0, P.r - P.l, h);
+  ctx.clip();
   yAxis(ctx, P, Y, lo, hi, fmtPrice);
-  xDates(ctx, P, X, a, end, (i) => d.t0 + Math.round(i) * d.step, end - a < 200);
-  const bw = (P.r - P.l) / (end - a + 1);
+  xDates(ctx, P, X, left, right - 1, (i) => d.t0 + Math.round(i) * d.step, width < 200);
+  const bw = (P.r - P.l) / width;
   // the two risk lines, as steps (each hour has its own level)
   const stepLine = (get, color) => {
     ctx.strokeStyle = color;
@@ -164,6 +180,7 @@ function drawRisk() {
       ctx.strokeStyle = C.text; ctx.lineWidth = 1.5; ctx.stroke();
     }
   }
+  ctx.restore();
   // direct labels at the right end
   const labels = [[Y(t(end)), "Timestral", C.timestral], [Y(g(end)), "GARCH", C.garch], [Y(d.close[end]), "price", C.text]].sort((p, q) => p[0] - q[0]);
   let last = -Infinity;
@@ -182,7 +199,11 @@ function drawRisk() {
     ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(X(i), P.t); ctx.lineTo(X(i), P.b); ctx.stroke();
   }
-  // stats: the window shown and everything up to its end
+  risk.geom = { a, end, X, P, left, width };
+  // stats: the window shown and everything up to its end (only when a new hour is shown)
+  const statKey = `${risk.pair}|${risk.level}|${risk.win}|${end}`;
+  if (statKey === risk.statKey) return;
+  risk.statKey = statKey;
   const lvlTxt = risk.level === "01" ? "1%" : "5%";
   const win = riskStats(d, a, end, risk.level);
   const all = riskStats(d, 0, end, risk.level);
@@ -193,7 +214,6 @@ function drawRisk() {
       <div class="row"><span>Average miss from the start (lower is better)</span><b>${all[m].loss.toFixed(2)} bp</b></div>
     </div>`;
   $("risk-stats").innerHTML = stat("t", "Timestral", C.timestral) + stat("g", "GARCH (tuned on the previous six months)", C.garch);
-  risk.geom = { a, end, X, P };
 }
 
 function riskHover(e) {
@@ -201,7 +221,7 @@ function riskHover(e) {
   if (!gm) return;
   const rect = e.target.getBoundingClientRect();
   const x = e.clientX - rect.left;
-  const i = Math.round(gm.a + ((x - gm.P.l) / (gm.P.r - gm.P.l)) * (gm.end - gm.a + 1) - 0.5);
+  const i = Math.round(gm.left + ((x - gm.P.l) / (gm.P.r - gm.P.l)) * gm.width - 0.5);
   if (i < gm.a || i > gm.end) { risk.hover = null; tooltip(e.target, null); drawRisk(); return; }
   risk.hover = i;
   drawRisk();
@@ -232,8 +252,8 @@ function riskFrame(ts) {
   if (next !== risk.end) {
     risk.end = next;
     $("risk-scrub").value = Math.round((risk.end / (n - 1)) * 1000);
-    drawRisk();
   }
+  drawRisk();
   if (risk.end >= n - 1) { risk.playing = false; $("risk-play").textContent = "Play"; return; }
   requestAnimationFrame(riskFrame);
 }

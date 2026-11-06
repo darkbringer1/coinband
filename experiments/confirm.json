@@ -1,0 +1,74 @@
+[
+ {
+  "interval": "1h",
+  "trend_window": 0,
+  "horizon": 96,
+  "fetch_bars": 13152,
+  "model": "28M",
+  "context": 2048,
+  "covariates": false
+ },
+ {
+  "interval": "1h",
+  "trend_window": 0,
+  "horizon": 96,
+  "fetch_bars": 13152,
+  "model": "28M",
+  "context": 4096,
+  "covariates": false
+ },
+ {
+  "interval": "1h",
+  "trend_window": 0,
+  "horizon": 96,
+  "fetch_bars": 13152,
+  "model": "28M",
+  "context": 4096,
+  "covariates": true
+ },
+ {
+  "interval": "1h",
+  "trend_window": 0,
+  "horizon": 96,
+  "fetch_bars": 13152,
+  "model": "123M",
+  "context": 4096,
+  "covariates": false
+ },
+ {
+  "interval": "1h",
+  "trend_window": 0,
+  "horizon": 96,
+  "fetch_bars": 13152,
+  "model": "209M",
+  "context": 2048,
+  "covariates": false
+ },
+ {
+  "interval": "1h",
+  "trend_window": 0,
+  "horizon": 96,
+  "fetch_bars": 13152,
+  "model": "209M",
+  "context": 4096,
+  "covariates": false
+ },
+ {
+  "interval": "1h",
+  "trend_window": 0,
+  "horizon": 96,
+  "fetch_bars": 13152,
+  "model": "209M",
+  "context": 4096,
+  "covariates": true
+ },
+ {
+  "interval": "1h",
+  "trend_window": 0,
+  "horizon": 96,
+  "fetch_bars": 13152,
+  "model": "209M",
+  "context": 8192,
+  "covariates": false
+ }
+]

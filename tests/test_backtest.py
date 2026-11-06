@@ -4,7 +4,16 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-from coinband.backtest import BAND_LEVELS, BacktestParams, origin_indices, run_backtest, score_origin, summarize
+from coinband.backtest import (
+    BAND_LEVELS,
+    BacktestParams,
+    apply_trend,
+    naive_quantiles,
+    origin_indices,
+    run_backtest,
+    score_origin,
+    trend_slope,
+)
 
 LEVELS = (0.01, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.99)
 
@@ -18,10 +27,12 @@ class FakeForecaster:
         self.spread = spread
         self.drift = drift
         self.calls = []
+        self.covariates = []
 
-    def forecast(self, context, prediction_length):
+    def forecast(self, context, prediction_length, past_covariates=None):
         context = np.asarray(context)
         self.calls.append(context.copy())
+        self.covariates.append(None if past_covariates is None else np.asarray(past_covariates).copy())
         b = context.shape[0]
         last = np.array([row[0][np.isfinite(row[0])][-1] for row in context])
         offsets = np.array([(q - 0.5) * 2 * self.spread for q in LEVELS])
@@ -90,6 +101,9 @@ def test_bands_are_quantile_order_and_follow_last_value():
             assert step[3] == pytest.approx(50.0 + 0.8 * 2.0)  # P90
 
 
+BL = (0.05, 0.1, 0.5, 0.9, 0.95)
+
+
 def test_score_origin_coverage_mae_and_direction():
     close = np.array([10.0, 10.0, 10.0, 11.0, 13.0, 12.0])
     # origin 3: last known = 10, realized = [11, 13, 12]
@@ -101,38 +115,70 @@ def test_score_origin_coverage_mae_and_direction():
             [8.0, 9.0, 11.0, 12.0, 13.0],  # 12 inside (edge)
         ]
     )
-    s = score_origin(close, 3, bands, 3, lo=1, mid=2, hi=3)
+    s = score_origin(close, 3, bands, BL, 3)
     assert s["realized"] == 3
     assert s["coverage"] == pytest.approx(2 / 3)
     assert s["mae"] == pytest.approx((0 + 2 + 1) / 3)
     assert s["naive_mae"] == pytest.approx((1 + 3 + 2) / 3)
     assert s["direction_hit"] is True
+    assert s["crps"] > 0 and s["naive_crps"] is None
 
     down = bands.copy()
     down[:, 2] = 9.0
-    assert score_origin(close, 3, down, 3, 1, 2, 3)["direction_hit"] is False
+    assert score_origin(close, 3, down, BL, 3)["direction_hit"] is False
+
+
+def test_crps_is_zero_for_a_perfect_point_forecast():
+    close = np.array([10.0, 10.0, 11.0, 12.0])
+    q = np.repeat(close[2:, None], 5, axis=1)
+    assert score_origin(close, 2, q, BL, 2)["crps"] == pytest.approx(0.0)
 
 
 def test_partial_horizon_scores_without_direction():
     close = np.array([10.0, 10.0, 11.0])
     bands = np.tile([8.0, 9.0, 10.0, 12.0, 13.0], (4, 1))
-    s = score_origin(close, 2, bands, 4, 1, 2, 3)
+    s = score_origin(close, 2, bands, BL, 4)
     assert s["realized"] == 1
     assert s["coverage"] == 1.0
     assert s["direction_hit"] is None
 
 
 def test_summary_skill_against_naive():
-    close = np.cumsum(np.ones(400))  # steady uptrend: a drifting forecaster beats "flat"
+    close = np.exp(np.arange(400) * 0.01)  # steady uptrend: a drifting forecaster beats "flat"
     out = run_backtest(
-        FakeForecaster(spread=5.0, drift=1.0), close, BacktestParams(context=64, horizon=10, stride=10, min_context=16)
+        FakeForecaster(spread=0.0, drift=0.0), close, BacktestParams(context=64, horizon=10, stride=10, min_context=16)
     )
     s = out["summary"]
     assert s["scored"] == len(out["origins"]) - 1
-    assert s["skill"] == pytest.approx(1.0)
+    assert s["skill"] == pytest.approx(0.0, abs=1e-5)  # the fake median is "flat"
+    assert set(s["by_horizon"]) == {"coverage", "mae_skill", "crps_skill"}
+    assert len(s["by_horizon"]["coverage"]) == 10
+    assert s["calibration"]["levels"] == list(LEVELS)
+
+
+def test_trend_drift_fits_the_slope_and_beats_plain_on_a_trend():
+    close = np.exp(np.arange(400) * 0.01)
+    assert trend_slope(close, 200, 50) == pytest.approx(0.01)
+    tilted = apply_trend(np.ones((3, 2)), 0.01)
+    np.testing.assert_allclose(tilted[:, 0], np.exp([0.01, 0.02, 0.03]))
+
+    out = run_backtest(
+        FakeForecaster(spread=0.0), close, BacktestParams(context=64, horizon=10, stride=10, min_context=16, trend_window=50)
+    )
+    s = out["summary"]
+    assert out["trend"] is True
+    assert s["skill"] == pytest.approx(1.0, abs=1e-4)
     assert s["direction_hit_rate"] == 1.0
-    assert s["coverage"] == 1.0
-    assert summarize([])["scored"] == 0
+    assert s["plain"]["skill"] == pytest.approx(0.0, abs=1e-5)
+    assert out["origins"][5]["slope"] == pytest.approx(0.01)
+
+
+def test_calibration_of_a_matching_random_walk():
+    rng = np.random.default_rng(0)
+    close = 100 * np.exp(np.cumsum(rng.normal(0, 0.01, 3000)))
+    naive = naive_quantiles(close, 1500, 4, LEVELS, 500)
+    assert naive.shape == (4, len(LEVELS))
+    assert np.all(np.diff(naive, axis=1) > 0)
 
 
 def test_rejects_missing_quantile_levels():
@@ -157,3 +203,27 @@ def test_progress_reports_every_chunk():
     )
     assert seen[0][0] == 0 and seen[-1][0] == seen[-1][1]
     assert all(b[0] > a[0] for a, b in zip(seen, seen[1:]))
+
+
+def test_covariates_are_aligned_with_the_context():
+    rng = np.random.default_rng(1)
+    close = 100 * np.exp(np.cumsum(rng.normal(0, 0.01, 300)))
+    volume = rng.uniform(1, 1000, 300)
+    fc = FakeForecaster()
+    params = BacktestParams(context=64, horizon=4, stride=4, min_context=16, batch_size=8, covariates=True)
+    out = run_backtest(fc, close, params, volume=volume)
+    assert out["covariates"] is True
+    origins = origin_indices(300, params)
+    cov = fc.covariates[-1]
+    i = origins[-1]
+    assert cov.shape == (len(origins) % 8 or 8, 2, 64)
+    np.testing.assert_allclose(cov[-1, 0], np.log1p(volume[i - 64 : i]), rtol=1e-5)
+    np.testing.assert_allclose(cov[-1, 1], np.abs(np.diff(np.log(close[i - 65 : i]))), rtol=1e-4)
+    # an early origin is NaN-padded on the left, like its price context
+    first = fc.covariates[0][0]
+    assert np.isnan(first[:, : 64 - origins[0]]).all()
+
+
+def test_covariates_need_volume():
+    with pytest.raises(ValueError, match="volume"):
+        run_backtest(FakeForecaster(), np.ones(100), BacktestParams(context=32, horizon=4, min_context=16, covariates=True))

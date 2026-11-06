@@ -101,3 +101,55 @@ def test_bad_request(server):
 def test_parse_request_rejects(body):
     with pytest.raises(ValueError):
         parse_request(body)
+
+
+def wait_job(server, job_id):
+    for _ in range(200):
+        _, _, raw = get(f"{server}/api/jobs/{job_id}")
+        job = json.loads(raw)
+        if job["status"] in ("done", "error"):
+            return job
+        time.sleep(0.05)
+    raise AssertionError("job did not finish")
+
+
+def test_leaderboard_job(server):
+    status, body = post(
+        f"{server}/api/leaderboard",
+        {"symbols": "BTCUSDT, ethusdt BTCUSDT", "bars": 400, "horizon": 8, "max_origins": 50, "trend_window": 24},
+    )
+    assert status == 202
+    job = wait_job(server, body["job_id"])
+    assert job["status"] == "done", job
+    rows = job["result"]["rows"]
+    assert [r["symbol"] for r in rows] == ["BTCUSDT", "ETHUSDT"]
+    assert rows[0]["summary"]["scored"] > 0
+    assert "by_horizon" not in rows[0]["summary"]
+    assert rows[0]["plain_crps_skill"] is not None
+
+
+def test_backtest_result_has_analysis(server):
+    _, body = post(f"{server}/api/backtest", {"symbol": "BTCUSDT", "bars": 400, "horizon": 8, "max_origins": 50})
+    r = wait_job(server, body["job_id"])["result"]
+    assert len(r["summary"]["by_horizon"]["crps_skill"]) == 8
+    assert r["params"]["trend_window"] == 0 and r["trend"] is False
+
+
+def test_offload_moves_nested_tensors():
+    import dataclasses
+
+    import torch
+
+    from coinband.device import Offload, _to
+
+    @dataclasses.dataclass
+    class Mask:
+        mask: torch.Tensor
+        enc_len: int
+
+    moved = _to((torch.ones(2), Mask(torch.zeros(1), 3), {"k": [torch.ones(1)]}), "cpu")
+    assert moved[1].enc_len == 3 and isinstance(moved[1].mask, torch.Tensor)
+    lin = torch.nn.Linear(2, 2)
+    off = Offload(lin, "cpu")
+    x = torch.ones(1, 2)
+    assert torch.allclose(off(x), lin(x))

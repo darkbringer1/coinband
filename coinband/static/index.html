@@ -32,10 +32,10 @@
         </label>
         <div class="row">
           <label>Bars to fetch
-            <input id="bars" name="bars" type="number" min="100" max="50000" step="100" value="3000">
+            <input id="bars" name="bars" type="number" min="100" max="50000" step="100" value="6000">
           </label>
           <label>Context
-            <input id="context" name="context" type="number" min="32" max="32768" step="32" value="2048">
+            <input id="context" name="context" type="number" min="32" max="32768" step="32" value="4096">
           </label>
         </div>
         <div class="row">
@@ -46,8 +46,16 @@
             <input id="stride" name="stride" type="number" min="1" max="10000" value="1">
           </label>
         </div>
-        <label>Max origins
-          <input id="max_origins" name="max_origins" type="number" min="1" max="10000" value="1000">
+        <div class="row">
+          <label>Max origins
+            <input id="max_origins" name="max_origins" type="number" min="1" max="10000" value="1000">
+          </label>
+          <label title="Tilt each forecast by the log-price slope of the last N bars. 0 = plain Timestral.">Trend window
+            <input id="trend_window" name="trend_window" type="number" min="0" max="5000" value="0">
+          </label>
+        </div>
+        <label class="check-row" title="Feed log volume and the absolute 1-bar return as past covariates. Helped 1 to 6 bars ahead, hurt 24+ in one of two test periods; about 6x slower.">
+          <input id="covariates" type="checkbox"> Volume covariates
         </label>
         <button id="run" type="submit">Run backtest</button>
         <div id="progress" class="progress" hidden>
@@ -59,6 +67,7 @@
           Each origin forecasts <em>horizon</em> bars from the <em>context</em> bars before it.
           A new forecast is made every <em>stride</em> bars (1 = every bar, so the cone moves with the price).
           The last one starts at the last closed candle: a live forecast. <em>Max origins</em> caps how many bars are replayed.
+          <em>Trend window</em> &gt; 0 adds the recent drift to every forecast; the plain forecast is scored next to it.
         </p>
       </form>
     </aside>
@@ -95,10 +104,44 @@
       <div class="metrics" id="metrics">
         <div class="metric"><div class="k">80% band coverage</div><div class="v" id="m-coverage">–</div><div class="s">target 80%</div></div>
         <div class="metric"><div class="k">Median MAE vs naive</div><div class="v" id="m-skill">–</div><div class="s" id="m-mae">naive = price stays flat</div></div>
+        <div class="metric"><div class="k">CRPS skill vs random walk</div><div class="v" id="m-crps">–</div><div class="s" id="m-crps-sub">whole band vs naive band</div></div>
         <div class="metric"><div class="k">Direction at horizon end</div><div class="v" id="m-direction">–</div><div class="s">hit rate of the median</div></div>
         <div class="metric"><div class="k">Scored origins</div><div class="v" id="m-scored">–</div><div class="s" id="m-breaches">breaches</div></div>
         <div class="metric live"><div class="k">Live forecast</div><div class="v" id="m-live">–</div><div class="s" id="m-live-band"></div></div>
       </div>
+
+      <section class="analysis" id="analysis" hidden>
+        <h2>How right was it? <span class="sub" id="analysis-sub"></span></h2>
+        <div class="charts">
+          <figure>
+            <figcaption>80% band coverage by bars ahead</figcaption>
+            <div class="chart-box"><canvas id="c-coverage"></canvas><div class="tip" hidden></div></div>
+          </figure>
+          <figure>
+            <figcaption>Skill vs naive by bars ahead <span class="hint-inline">above 0 beats naive</span></figcaption>
+            <div class="chart-box"><canvas id="c-skill"></canvas><div class="tip" hidden></div></div>
+          </figure>
+          <figure>
+            <figcaption>Calibration <span class="hint-inline">on the diagonal = calibrated</span></figcaption>
+            <div class="chart-box"><canvas id="c-calibration"></canvas><div class="tip" hidden></div></div>
+          </figure>
+        </div>
+        <details>
+          <summary>Table view</summary>
+          <div class="table-wrap" id="horizon-table"></div>
+        </details>
+      </section>
+
+      <section class="leaderboard">
+        <h2>Leaderboard <span class="sub">same settings, several pairs</span></h2>
+        <form id="lb-form" class="lb-form" autocomplete="off">
+          <input id="lb-symbols" value="BTCUSDT ETHUSDT SOLUSDT BNBUSDT XRPUSDT DOGEUSDT" spellcheck="false" aria-label="Pairs">
+          <button id="lb-run" type="submit">Run leaderboard</button>
+          <span id="lb-progress" class="muted"></span>
+        </form>
+        <div id="lb-error" class="error" hidden></div>
+        <div class="table-wrap" id="lb-table"></div>
+      </section>
     </section>
   </main>
 

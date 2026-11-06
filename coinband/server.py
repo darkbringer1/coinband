@@ -3,6 +3,7 @@
     GET  /api/symbols          spot pairs trading on Binance
     GET  /api/models           Timestral checkpoints and which are loaded
     POST /api/backtest         start a backtest job, returns {"job_id"}
+    POST /api/leaderboard      same settings over several pairs, returns {"job_id"}
     GET  /api/jobs/<id>        job status, progress and (once done) the result
 """
 
@@ -32,7 +33,7 @@ MODELS = [
     {"id": "mistralai/Timestral-123M", "name": "Timestral-123M", "size_mb": 490},
     {"id": "mistralai/Timestral-209M", "name": "Timestral-209M", "size_mb": 837},
 ]
-DEFAULT_MODEL = "mistralai/Timestral-28M"
+DEFAULT_MODEL = "mistralai/Timestral-209M"
 
 LIMITS = {
     "bars": (100, 50_000),
@@ -40,7 +41,10 @@ LIMITS = {
     "horizon": (1, 512),
     "stride": (1, 10_000),
     "max_origins": (1, 10_000),
+    "trend_window": (0, 5_000),
 }
+MAX_LEADERBOARD_SYMBOLS = 20
+DEFAULT_LEADERBOARD = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT", "DOGEUSDT"]
 JOB_TTL_S = 3600
 MAX_JOBS = 50
 
@@ -50,8 +54,12 @@ def pick_device(requested: str | None) -> str:
         return requested
     import torch
 
+    from coinband.device import mps_available
+
     if torch.cuda.is_available():
         return "cuda"
+    if mps_available():
+        return "mps"
     return "cpu"
 
 
@@ -74,14 +82,15 @@ class ModelCache:
                 if self._loader is not None:
                     self._models[model_id] = self._loader(model_id, self.device)
                 else:
-                    from timestral import TimestralForecaster
+                    from coinband.device import load_forecaster
 
-                    self._models[model_id] = TimestralForecaster.from_pretrained(model_id, device=self.device)
+                    self._models[model_id] = load_forecaster(model_id, self.device)
             return self._models[model_id]
 
 
 class Job:
-    def __init__(self, request: dict) -> None:
+    def __init__(self, request: dict, kind: str = "backtest") -> None:
+        self.kind = kind
         self.id = uuid.uuid4().hex[:12]
         self.request = request
         self.status = "queued"  # queued | running | done | error
@@ -102,6 +111,7 @@ class Job:
         with self.lock:
             out = {
                 "job_id": self.id,
+                "kind": self.kind,
                 "status": self.status,
                 "phase": self.phase,
                 "done": self.done,
@@ -113,21 +123,37 @@ class Job:
             return out
 
 
-def parse_request(body: dict) -> dict:
-    """Validate a backtest request; raises ValueError with a user-facing message."""
+def _parse_symbol(raw) -> str:
+    symbol = str(raw).strip().upper()
+    if not symbol.isalnum() or not 2 <= len(symbol) <= 20:
+        raise ValueError(f"{symbol or 'symbol'}: must be a Binance pair like BTCUSDT")
+    return symbol
+
+
+def parse_request(body: dict, leaderboard: bool = False) -> dict:
+    """Validate a backtest (or leaderboard) request; raises ValueError with a user-facing message."""
     if not isinstance(body, dict):
         raise ValueError("expected a JSON object")
-    symbol = str(body.get("symbol", "")).strip().upper()
-    if not symbol.isalnum() or not 2 <= len(symbol) <= 20:
-        raise ValueError("symbol must be a Binance pair like BTCUSDT")
+    if leaderboard:
+        raw = body.get("symbols") or DEFAULT_LEADERBOARD
+        if isinstance(raw, str):
+            raw = raw.replace(",", " ").split()
+        symbols = list(dict.fromkeys(_parse_symbol(s) for s in raw))
+        if not 1 <= len(symbols) <= MAX_LEADERBOARD_SYMBOLS:
+            raise ValueError(f"give 1 to {MAX_LEADERBOARD_SYMBOLS} pairs")
+        symbol = None
+    else:
+        symbol = _parse_symbol(body.get("symbol", ""))
     interval = str(body.get("interval", "1h"))
     if interval not in INTERVALS:
         raise ValueError(f"interval must be one of {', '.join(INTERVALS)}")
     model = str(body.get("model", DEFAULT_MODEL))
     if model not in {m["id"] for m in MODELS}:
         raise ValueError("unknown model")
-    defaults = {"bars": 3000, "context": 2048, "horizon": 24, "stride": 1, "max_origins": 1000}
+    defaults = {"bars": 6000, "context": 4096, "horizon": 24, "stride": 1, "max_origins": 1000, "trend_window": 0}
     out: dict = {"symbol": symbol, "interval": interval, "model": model}
+    if leaderboard:
+        out["symbols"] = symbols
     for key, default in defaults.items():
         raw = body.get(key, default)
         try:
@@ -138,6 +164,12 @@ def parse_request(body: dict) -> dict:
         if not lo <= value <= hi:
             raise ValueError(f"{key} must be between {lo} and {hi}")
         out[key] = value
+    cov = body.get("covariates", False)
+    if not isinstance(cov, bool):
+        raise ValueError("covariates must be true or false")
+    out["covariates"] = cov
+    if out["trend_window"] == 1:
+        raise ValueError("trend_window must be 0 (off) or >= 2")
     return out
 
 
@@ -149,8 +181,8 @@ class App:
         self.fetch_klines = klines_fetcher
         self.list_symbols = symbols_fetcher
 
-    def submit(self, request: dict) -> Job:
-        job = Job(request)
+    def submit(self, request: dict, kind: str = "backtest") -> Job:
+        job = Job(request, kind)
         with self.jobs_lock:
             now = time.time()
             for jid in [j for j, v in self.jobs.items() if now - v.created > JOB_TTL_S]:
@@ -159,39 +191,64 @@ class App:
                 oldest = min(self.jobs.values(), key=lambda j: j.created)
                 del self.jobs[oldest.id]
             self.jobs[job.id] = job
-        threading.Thread(target=self._run, args=(job,), daemon=True).start()
+        target = self._run_leaderboard if kind == "leaderboard" else self._run
+        threading.Thread(target=target, args=(job,), daemon=True).start()
         return job
 
     def job(self, job_id: str) -> Job | None:
         with self.jobs_lock:
             return self.jobs.get(job_id)
 
+    def _backtest(self, job: Job, r: dict, symbol: str, label: str = "") -> tuple:
+        """Fetch and backtest one pair, reporting progress on `job`; returns `(klines, result, seconds)`."""
+        job.update(phase=f"{label}fetching", done=0, total=r["bars"])
+        klines = self.fetch_klines(symbol, r["interval"], r["bars"], progress=lambda d, t: job.update(done=d, total=t))
+        job.update(phase=f"{label}loading model", done=0, total=0)
+        forecaster = self.models.get(r["model"])
+        params = BacktestParams(
+            context=r["context"],
+            horizon=r["horizon"],
+            stride=r["stride"],
+            max_origins=r["max_origins"],
+            trend_window=r["trend_window"],
+            covariates=r["covariates"],
+        )
+        job.update(phase=f"{label}waiting for model")
+        with self.models.inference_lock:
+            job.update(phase=f"{label}forecasting")
+            started = time.time()
+            bt = run_backtest(
+                forecaster,
+                klines.close,
+                params,
+                progress=lambda d, t: job.update(done=d, total=t),
+                volume=klines.volume,
+            )
+            elapsed = time.time() - started
+        return klines, bt, elapsed
+
+    def _guard(self, job: Job, fn) -> None:
+        try:
+            job.update(status="running")
+            result = fn()
+            job.update(status="done", phase="done", result=result)
+        except (BinanceError, ValueError) as e:
+            job.update(status="error", phase="error", error=str(e))
+        except Exception as e:  # surface anything else to the UI, keep the server alive
+            traceback.print_exc()
+            job.update(status="error", phase="error", error=f"{type(e).__name__}: {e}")
+
     def _run(self, job: Job) -> None:
         r = job.request
-        try:
-            job.update(status="running", phase="fetching", done=0, total=r["bars"])
-            klines = self.fetch_klines(
-                r["symbol"], r["interval"], r["bars"], progress=lambda d, t: job.update(done=d, total=t)
-            )
-            job.update(phase="loading model", done=0, total=0)
-            forecaster = self.models.get(r["model"])
-            params = BacktestParams(
-                context=r["context"], horizon=r["horizon"], stride=r["stride"], max_origins=r["max_origins"]
-            )
-            job.update(phase="waiting for model")
-            with self.models.inference_lock:
-                job.update(phase="forecasting")
-                started = time.time()
-                bt = run_backtest(
-                    forecaster, klines.close, params, progress=lambda d, t: job.update(done=d, total=t)
-                )
-                elapsed = time.time() - started
-            result = {
+
+        def go():
+            klines, bt, elapsed = self._backtest(job, r, r["symbol"])
+            return {
                 "symbol": klines.symbol,
                 "interval": klines.interval,
                 "interval_ms": INTERVALS[klines.interval],
                 "model": r["model"],
-                "params": {k: r[k] for k in ("context", "horizon", "stride", "max_origins")},
+                "params": {k: r[k] for k in ("context", "horizon", "stride", "max_origins", "trend_window", "covariates")},
                 "time": klines.open_time,
                 "close": klines.close,
                 "high": klines.high,
@@ -199,12 +256,51 @@ class App:
                 "inference_s": round(elapsed, 2),
                 **bt,
             }
-            job.update(status="done", phase="done", result=result)
-        except (BinanceError, ValueError) as e:
-            job.update(status="error", phase="error", error=str(e))
-        except Exception as e:  # surface anything else to the UI, keep the server alive
-            traceback.print_exc()
-            job.update(status="error", phase="error", error=f"{type(e).__name__}: {e}")
+
+        self._guard(job, go)
+
+    def _run_leaderboard(self, job: Job) -> None:
+        r = job.request
+
+        def go():
+            rows = []
+            symbols = r["symbols"]
+            for n, symbol in enumerate(symbols):
+                label = f"{symbol} ({n + 1}/{len(symbols)}): "
+                try:
+                    klines, bt, elapsed = self._backtest(job, r, symbol, label)
+                except (BinanceError, ValueError) as e:
+                    rows.append({"symbol": symbol, "error": str(e)})
+                    continue
+                s = dict(bt["summary"])
+                s.pop("by_horizon", None)
+                s.pop("calibration", None)
+                plain = s.pop("plain", None)
+                live = bt["origins"][-1]
+                last = klines.close[-1]
+                tip = live["bands"][-1]
+                rows.append(
+                    {
+                        "symbol": klines.symbol,
+                        "bars": len(klines),
+                        "last": last,
+                        "summary": s,
+                        "plain_crps_skill": plain.get("crps_skill") if plain else None,
+                        "live_change": tip[2] / last - 1 if tip[2] is not None else None,
+                        "live_band": [tip[1], tip[3]],
+                        "inference_s": round(elapsed, 2),
+                    }
+                )
+            return {
+                "interval": r["interval"],
+                "model": r["model"],
+                "params": {
+                    k: r[k] for k in ("bars", "context", "horizon", "stride", "max_origins", "trend_window", "covariates")
+                },
+                "rows": rows,
+            }
+
+        self._guard(job, go)
 
 
 def make_handler(app: App):
@@ -255,19 +351,20 @@ def make_handler(app: App):
 
         def do_POST(self):
             path = self.path.split("?", 1)[0]
-            if path != "/api/backtest":
+            if path not in ("/api/backtest", "/api/leaderboard"):
                 self._error(HTTPStatus.NOT_FOUND, "not found")
                 return
+            kind = "leaderboard" if path == "/api/leaderboard" else "backtest"
             try:
                 length = int(self.headers.get("Content-Length", "0"))
                 if length > 100_000:
                     raise ValueError("request too large")
                 body = json.loads(self.rfile.read(length) or b"{}")
-                request = parse_request(body)
+                request = parse_request(body, leaderboard=kind == "leaderboard")
             except (ValueError, json.JSONDecodeError) as e:
                 self._error(HTTPStatus.BAD_REQUEST, str(e))
                 return
-            job = app.submit(request)
+            job = app.submit(request, kind)
             self._json({"job_id": job.id}, HTTPStatus.ACCEPTED)
 
         def _static(self, path: str) -> None:

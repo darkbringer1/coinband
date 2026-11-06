@@ -7,3 +7,5 @@ dist/
 *.safetensors
 .DS_Store
 recordings/
+experiments/cache/
+experiments/results/

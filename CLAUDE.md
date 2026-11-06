@@ -28,6 +28,11 @@ forecast band on the real price. Planned to be open-sourced along with a blog po
 - `coinband/static/`: `index.html`, `app.js`, `style.css`. Playhead animation with a follow or full view, a trail
   of past bands, the current fan ahead of the playhead, red marks where the price leaves the band, live metrics,
   and canvas `MediaRecorder` export to `.webm` for the blog.
+- `coinband/device.py`: runs only the transformer on Apple-silicon GPUs (MPS); timestral's float64 scaling stays
+  on the CPU. Wraps upstream objects at runtime, copies no timestral code.
+- `experiments/`: accuracy sweep (`sweep.py`), tables with block-bootstrap CIs (`analyze.py`, `effects.py`) and
+  the SVG figure (`figures.py`). Cache and results are gitignored.
+- `docs/paper.md`: the write-up of the sweep; it is the source for the current defaults.
 - `tests/`: engine tests with a fake forecaster (no weights needed).
 
 ## Run

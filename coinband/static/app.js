@@ -20,8 +20,10 @@ const COLORS = {
   muted: "#8b98a8",
 };
 const L = { P05: 0, P10: 1, P50: 2, P90: 3, P95: 4 };
-const FORM_FIELDS = ["symbol", "interval", "model", "bars", "context", "horizon", "stride", "max_origins"];
-const STORE_KEY = "coinband.form.v2";
+const FORM_FIELDS = ["symbol", "interval", "model", "bars", "context", "horizon", "stride", "max_origins", "trend_window"];
+const NUMERIC_FIELDS = ["bars", "context", "horizon", "stride", "max_origins", "trend_window"];
+const SERIES = ["#3987e5", "#d95926"]; // analysis charts: validated on the dark surface
+const STORE_KEY = "coinband.form.v4";
 const AUTO_SECONDS = 30;
 const HOLD_SECONDS = 2; // pause on the live forecast at the end of a recording
 
@@ -108,6 +110,7 @@ async function loadModels() {
 function saveForm() {
   const v = {};
   for (const f of FORM_FIELDS) v[f] = $(f).value;
+  v.covariates = $("covariates").checked;
   localStorage.setItem(STORE_KEY, JSON.stringify(v));
 }
 
@@ -120,6 +123,7 @@ function restoreForm() {
       if (el.tagName === "SELECT" && ![...el.options].some((o) => o.value === v[f])) continue;
       el.value = v[f];
     }
+    if (typeof v.covariates === "boolean") $("covariates").checked = v.covariates;
   } catch { /* ignore */ }
 }
 
@@ -135,42 +139,57 @@ function showError(msg) {
   el.textContent = msg || "";
 }
 
-async function runBacktest(ev) {
-  ev.preventDefault();
-  showError("");
-  saveForm();
+function formBody() {
   const body = {};
   for (const f of FORM_FIELDS) body[f] = $(f).value;
   body.symbol = body.symbol.trim().toUpperCase();
-  for (const f of ["bars", "context", "horizon", "stride", "max_origins"]) body[f] = Number(body[f]);
+  for (const f of NUMERIC_FIELDS) body[f] = Number(body[f]);
+  body.covariates = $("covariates").checked;
+  return body;
+}
 
+function phaseLabel(job) {
+  const m = /^(.*: )?(.*)$/.exec(job.phase);
+  const prefix = m[1] || "";
+  const label = {
+    fetching: `Fetching candles ${job.done}/${job.total}`,
+    "loading model": "Loading model (first run downloads the weights)…",
+    "waiting for model": "Waiting for another job…",
+    forecasting: `Forecasting ${job.done}/${job.total} origins`,
+  }[m[2]] || m[2];
+  return prefix + label;
+}
+
+// Submit a job and poll it to completion; `onProgress(job)` sees each status.
+async function runJob(path, body, onProgress) {
+  const { job_id } = await api(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  for (;;) {
+    await new Promise((r) => setTimeout(r, 400));
+    const job = await api(`/api/jobs/${job_id}`);
+    if (job.status === "error") throw new Error(job.error);
+    if (job.status === "done") return job.result;
+    onProgress(job);
+  }
+}
+
+async function runBacktest(ev) {
+  if (ev) ev.preventDefault();
+  showError("");
+  saveForm();
+  const body = formBody();
   $("run").disabled = true;
   setProgress("Submitting…", 0);
   try {
-    const { job_id } = await api("/api/backtest", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    for (;;) {
-      await new Promise((r) => setTimeout(r, 400));
-      const job = await api(`/api/jobs/${job_id}`);
-      if (job.status === "error") throw new Error(job.error);
-      if (job.status === "done") {
-        setProgress(`Done: ${job.result.origins.length} origins in ${job.result.inference_s}s`, 1);
-        loadResult(job.result);
-        loadModels().then(() => ($("model").value = body.model)).catch(() => {});
-        break;
-      }
-      const frac = job.total ? job.done / job.total : 0;
-      const label = {
-        fetching: `Fetching candles ${job.done}/${job.total}`,
-        "loading model": "Loading model (first run downloads the weights)…",
-        "waiting for model": "Waiting for another job…",
-        forecasting: `Forecasting ${job.done}/${job.total} origins`,
-      }[job.phase] || job.phase;
-      setProgress(label, frac);
-    }
+    const result = await runJob("/api/backtest", body, (job) =>
+      setProgress(phaseLabel(job), job.total ? job.done / job.total : 0),
+    );
+    setProgress(`Done: ${result.origins.length} origins in ${result.inference_s}s`, 1);
+    loadResult(result);
+    loadModels().then(() => ($("model").value = body.model)).catch(() => {});
   } catch (e) {
     showError(e.message);
     $("progress").hidden = true;
@@ -224,6 +243,7 @@ function loadResult(r) {
   $("empty").hidden = true;
   for (const id of ["play", "restart", "scrub", "record"]) $(id).disabled = false;
   updateLive();
+  renderAnalysis(state.data);
   play(true);
 }
 
@@ -279,11 +299,13 @@ function speedBarsPerSec() {
 
 function liveMetrics(p) {
   const d = state.data;
-  let cov = 0, mae = 0, naive = 0, hits = 0, scored = 0;
+  let cov = 0, mae = 0, naive = 0, crps = 0, naiveCrps = 0, hits = 0, scored = 0;
   for (const o of d.origins) {
     if (o.end > p || o.direction_hit == null) continue;
     scored++;
     cov += o.coverage;
+    crps += o.crps;
+    naiveCrps += o.naive_crps;
     mae += o.mae;
     naive += o.naive_mae;
     hits += o.direction_hit ? 1 : 0;
@@ -298,6 +320,7 @@ function liveMetrics(p) {
     naive: scored ? naive / scored : null,
     skill: scored && naive > 0 ? 1 - mae / naive : null,
     direction: scored ? hits / scored : null,
+    crpsSkill: scored && naiveCrps > 0 ? 1 - crps / naiveCrps : null,
     breaches,
   };
 }
@@ -313,6 +336,13 @@ function updateMetrics(m) {
   const dir = $("m-direction");
   dir.textContent = pct(m.direction);
   dir.className = "v" + (m.direction == null ? "" : m.direction > 0.5 ? " good" : " bad");
+  const cr = $("m-crps");
+  cr.textContent = m.crpsSkill == null ? "–" : signedPct(m.crpsSkill, 1);
+  cr.className = "v" + (m.crpsSkill == null ? "" : m.crpsSkill > 0 ? " good" : " bad");
+  const plain = state.data.summary.plain;
+  $("m-crps-sub").textContent = plain && plain.crps_skill != null
+    ? `without trend: ${signedPct(plain.crps_skill, 1)} (full run)`
+    : "whole band vs naive band";
   $("m-scored").textContent = m.scored ? String(m.scored) : "–";
   $("m-breaches").textContent = `${m.breaches} bars outside the band`;
 }
@@ -630,7 +660,7 @@ function drawHud(w, h, plot) {
   ctx.font = "13px ui-sans-serif, system-ui, sans-serif";
   const modelName = d.model.split("/").pop();
   ctx.fillText(
-    `${modelName} · walk-forward, ${d.H}-bar horizon, ${d.params.stride === 1 ? "re-forecast every bar" : `${d.params.stride}-bar stride`}, ${d.params.context}-bar context`,
+    `${modelName}${d.covariates ? " + volume covariates" : ""}${d.trend ? ` + ${d.params.trend_window}-bar trend drift` : ""} · walk-forward, ${d.H}-bar horizon, ${d.params.stride === 1 ? "re-forecast every bar" : `${d.params.stride}-bar stride`}, ${d.params.context}-bar context`,
     16, 54,
   );
 
@@ -638,6 +668,7 @@ function drawHud(w, h, plot) {
   const chips = [
     ["80% coverage", pct(m.coverage), m.coverage == null ? COLORS.text : Math.abs(m.coverage - 0.8) <= 0.08 ? COLORS.good : COLORS.bad],
     ["MAE vs naive", m.skill == null ? "–" : signedPct(m.skill, 1), m.skill == null ? COLORS.text : m.skill > 0 ? COLORS.good : COLORS.bad],
+    ["CRPS skill", m.crpsSkill == null ? "–" : signedPct(m.crpsSkill, 1), m.crpsSkill == null ? COLORS.text : m.crpsSkill > 0 ? COLORS.good : COLORS.bad],
     ["direction hit", pct(m.direction), m.direction == null ? COLORS.text : m.direction > 0.5 ? COLORS.good : COLORS.bad],
     ["origins", String(m.scored), COLORS.text],
   ];
@@ -767,6 +798,259 @@ function toggleRecord() {
   play(true);
 }
 
+// ---------- analysis charts ----------
+
+function fmtSigned(v, d = 1) { return v == null ? "–" : signedPct(v, d); }
+
+// A small single-axis line/dot chart on a canvas, with a crosshair tooltip.
+// spec: {series: [{name, color, points: [[x, y]], dots?}], x: [min, max], y: [min, max], xLabel, yFmt, xFmt,
+//        refs: [{y, label}], diagonal?, tip: (i) => html}
+function smallChart(canvas, spec) {
+  const box = canvas.parentElement;
+  const tip = box.querySelector(".tip");
+  const state = { hover: null };
+  const render = () => {
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = Math.round(rect.width * dpr);
+    canvas.height = Math.round(rect.height * dpr);
+    const c = canvas.getContext("2d");
+    c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const w = rect.width, h = rect.height;
+    const P = { l: 44, r: w - 12, t: 10, b: h - 38 };
+    const [x0, x1] = spec.x, [y0, y1] = spec.y;
+    const X = (v) => P.l + ((v - x0) / (x1 - x0 || 1)) * (P.r - P.l);
+    const Y = (v) => P.b - ((v - y0) / (y1 - y0 || 1)) * (P.b - P.t);
+    spec._geom = { X, Y, P };
+    c.font = "11px ui-sans-serif, system-ui, sans-serif";
+    c.fillStyle = COLORS.muted;
+    c.strokeStyle = COLORS.grid;
+    c.lineWidth = 1;
+    // y grid
+    const ys = niceStep(y1 - y0, 4);
+    c.textAlign = "right"; c.textBaseline = "middle";
+    for (let v = Math.ceil(y0 / ys) * ys; v <= y1 + 1e-9; v += ys) {
+      c.beginPath(); c.moveTo(P.l, Y(v)); c.lineTo(P.r, Y(v)); c.stroke();
+      c.fillText(spec.yFmt(v), P.l - 6, Y(v));
+    }
+    // x ticks
+    const xs = Math.max(spec.xMinStep || 0, niceStep(x1 - x0, 5));
+    c.textAlign = "center"; c.textBaseline = "top";
+    for (let v = Math.ceil(x0 / xs) * xs; v <= x1 + 1e-9; v += xs) c.fillText(spec.xFmt(v), X(v), P.b + 6);
+    c.textAlign = "right"; c.textBaseline = "bottom";
+    c.fillText(spec.xLabel, P.r, h - 1);
+    // references
+    c.setLineDash([4, 4]);
+    c.strokeStyle = "rgba(139,152,168,0.6)";
+    for (const ref of spec.refs || []) {
+      c.beginPath(); c.moveTo(P.l, Y(ref.y)); c.lineTo(P.r, Y(ref.y)); c.stroke();
+      c.textAlign = "left"; c.textBaseline = "bottom";
+      c.fillText(ref.label, P.l + 4, Y(ref.y) - 2);
+    }
+    if (spec.diagonal) {
+      c.beginPath(); c.moveTo(X(x0), Y(x0)); c.lineTo(X(x1), Y(x1)); c.stroke();
+    }
+    c.setLineDash([]);
+    // series
+    for (const s of spec.series) {
+      c.strokeStyle = s.color;
+      c.lineWidth = 2;
+      c.lineJoin = "round";
+      c.beginPath();
+      let started = false;
+      for (const [x, y] of s.points) {
+        if (y == null) { started = false; continue; }
+        if (!started) { c.moveTo(X(x), Y(y)); started = true; } else c.lineTo(X(x), Y(y));
+      }
+      c.stroke();
+      if (s.dots) {
+        for (const [x, y] of s.points) {
+          if (y == null) continue;
+          c.fillStyle = s.color;
+          c.strokeStyle = COLORS.bg;
+          c.lineWidth = 2;
+          c.beginPath(); c.arc(X(x), Y(y), 4, 0, Math.PI * 2); c.fill(); c.stroke();
+        }
+      }
+    }
+    // direct labels at the line ends (<= 4 series)
+    if (spec.series.length > 1) {
+      c.font = "11px ui-sans-serif, system-ui, sans-serif";
+      c.textAlign = "right"; c.textBaseline = "bottom";
+      for (const s of spec.series) {
+        const last = [...s.points].reverse().find((p) => p[1] != null);
+        if (!last) continue;
+        c.fillStyle = COLORS.text;
+        c.fillText(s.name, X(last[0]) - 4, Y(last[1]) - 6);
+      }
+    }
+    // crosshair
+    if (state.hover != null) {
+      const px = spec.series[0].points[state.hover][0];
+      c.strokeStyle = "rgba(230,237,243,0.35)";
+      c.lineWidth = 1;
+      c.beginPath(); c.moveTo(X(px), P.t); c.lineTo(X(px), P.b); c.stroke();
+      for (const s of spec.series) {
+        const y = s.points[state.hover][1];
+        if (y == null) continue;
+        c.fillStyle = s.color; c.strokeStyle = COLORS.bg; c.lineWidth = 2;
+        c.beginPath(); c.arc(X(px), Y(y), 4.5, 0, Math.PI * 2); c.fill(); c.stroke();
+      }
+    }
+  };
+  canvas.onmousemove = (e) => {
+    const g = spec._geom;
+    if (!g) return;
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const pts = spec.series[0].points;
+    let best = 0;
+    for (let i = 1; i < pts.length; i++) if (Math.abs(g.X(pts[i][0]) - mx) < Math.abs(g.X(pts[best][0]) - mx)) best = i;
+    state.hover = best;
+    render();
+    tip.hidden = false;
+    tip.innerHTML = spec.tip(best);
+    const tx = g.X(pts[best][0]);
+    const left = tx + 12 + tip.offsetWidth > rect.width ? tx - 12 - tip.offsetWidth : tx + 12;
+    tip.style.left = `${left}px`;
+    tip.style.top = `${g.P.t + 4}px`;
+  };
+  canvas.onmouseleave = () => { state.hover = null; tip.hidden = true; render(); };
+  render();
+  return render;
+}
+
+const analysisCharts = [];
+
+function renderAnalysis(d) {
+  const s = d.summary;
+  const sec = $("analysis");
+  if (!s || !s.scored) { sec.hidden = true; return; }
+  sec.hidden = false;
+  const H = d.H;
+  const steps = Array.from({ length: H }, (_, k) => k + 1);
+  const bh = s.by_horizon;
+  const sw = (color) => `<span class="sw" style="background:${color}"></span>`;
+  const plain = s.plain;
+  $("analysis-sub").textContent =
+    `${s.scored} fully played-out forecasts · calibration error ${pct(s.calibration_error, 1)}` +
+    (plain ? ` · CRPS skill ${fmtSigned(s.crps_skill)} with trend vs ${fmtSigned(plain.crps_skill)} without` : "");
+
+  const covVals = bh.coverage;
+  const cmin = Math.min(0.5, ...covVals) - 0.02, cmax = Math.max(1, ...covVals);
+  const skills = [...bh.mae_skill, ...bh.crps_skill].filter((v) => v != null);
+  const sLo = Math.min(-0.05, ...skills), sHi = Math.max(0.05, ...skills);
+  const pad = (sHi - sLo) * 0.1;
+  const cal = s.calibration;
+
+  analysisCharts.length = 0;
+  analysisCharts.push(smallChart($("c-coverage"), {
+    series: [{ name: "coverage", color: SERIES[0], points: steps.map((k, i) => [k, covVals[i]]) }],
+    x: [1, H], y: [cmin, cmax], xMinStep: 1, xLabel: "bars ahead", xFmt: (v) => String(v), yFmt: (v) => pct(v, 0),
+    refs: [{ y: 0.8, label: "80% target" }],
+    tip: (i) => `${i + 1} bar${i ? "s" : ""} ahead<br>${sw(SERIES[0])}coverage ${pct(covVals[i])}`,
+  }));
+  analysisCharts.push(smallChart($("c-skill"), {
+    series: [
+      { name: "MAE skill", color: SERIES[0], points: steps.map((k, i) => [k, bh.mae_skill[i]]) },
+      { name: "CRPS skill", color: SERIES[1], points: steps.map((k, i) => [k, bh.crps_skill[i]]) },
+    ],
+    x: [1, H], y: [sLo - pad, sHi + pad], xMinStep: 1, xLabel: "bars ahead", xFmt: (v) => String(v), yFmt: (v) => fmtSigned(v, 0),
+    refs: [{ y: 0, label: "naive" }],
+    tip: (i) => `${i + 1} bar${i ? "s" : ""} ahead<br>${sw(SERIES[0])}MAE skill ${fmtSigned(bh.mae_skill[i])}<br>${sw(SERIES[1])}CRPS skill ${fmtSigned(bh.crps_skill[i])}`,
+  }));
+  analysisCharts.push(smallChart($("c-calibration"), {
+    series: [{ name: "observed", color: SERIES[0], dots: true, points: cal.levels.map((l, i) => [l, cal.observed[i]]) }],
+    x: [0, 1], y: [0, 1], xLabel: "quantile level", xFmt: (v) => pct(v, 0), yFmt: (v) => pct(v, 0), diagonal: true,
+    tip: (i) => `P${Math.round(cal.levels[i] * 100)}<br>${sw(SERIES[0])}price at or below it ${pct(cal.observed[i])} of the time<br>calibrated: ${pct(cal.levels[i], 0)}`,
+  }));
+
+  const rows = steps.map((k, i) => `<tr><td>${k}</td><td>${pct(covVals[i])}</td><td>${fmtSigned(bh.mae_skill[i])}</td><td>${fmtSigned(bh.crps_skill[i])}</td></tr>`).join("");
+  const calRows = cal.levels.map((l, i) => `<tr><td>P${Math.round(l * 100)}</td><td>${pct(cal.observed[i])}</td></tr>`).join("");
+  $("horizon-table").innerHTML =
+    `<table><thead><tr><th>Bars ahead</th><th>80% coverage</th><th>MAE skill</th><th>CRPS skill</th></tr></thead><tbody>${rows}</tbody></table>` +
+    `<table style="margin-top:12px"><thead><tr><th>Quantile</th><th>Price at or below it</th></tr></thead><tbody>${calRows}</tbody></table>`;
+}
+
+window.addEventListener("resize", () => analysisCharts.forEach((r) => r()));
+
+// ---------- leaderboard ----------
+
+const lb = { rows: [], sort: "crps_skill", trend: false };
+const LB_COLS = [
+  ["symbol", "Pair", (r) => r.symbol],
+  ["crps_skill", "CRPS skill", (r) => r.summary?.crps_skill, fmtSigned],
+  ["skill", "MAE skill", (r) => r.summary?.skill, fmtSigned],
+  ["coverage", "80% coverage", (r) => r.summary?.coverage, (v) => pct(v)],
+  ["calibration_error", "Calib. error", (r) => r.summary?.calibration_error, (v) => pct(v)],
+  ["direction_hit_rate", "Direction hit", (r) => r.summary?.direction_hit_rate, (v) => pct(v)],
+  ["plain_crps_skill", "CRPS skill, no trend", (r) => r.plain_crps_skill, fmtSigned],
+  ["live_change", "Live median", (r) => r.live_change, (v) => fmtSigned(v, 2)],
+];
+
+function renderLeaderboard() {
+  const cols = LB_COLS.filter((c) => c[0] !== "plain_crps_skill" || lb.trend);
+  const col = cols.find((c) => c[0] === lb.sort) || cols[1];
+  // lower is better only for calibration error; errors sink to the bottom
+  const dir = col[0] === "calibration_error" || col[0] === "symbol" ? 1 : -1;
+  const rows = [...lb.rows].sort((a, b) => {
+    const va = a.error ? null : col[2](a), vb = b.error ? null : col[2](b);
+    if (va == null) return 1;
+    if (vb == null) return -1;
+    return (va < vb ? -1 : va > vb ? 1 : 0) * dir;
+  });
+  const head = cols.map((c) => `<th data-k="${c[0]}" class="${c[0] === col[0] ? "sorted" : ""}">${c[1]}</th>`).join("");
+  const body = rows.map((r) => {
+    if (r.error) return `<tr data-s="${r.symbol}"><td>${r.symbol}</td><td colspan="${cols.length - 1}" class="bad" style="text-align:left">${r.error}</td></tr>`;
+    return `<tr data-s="${r.symbol}">` + cols.map((c, i) => {
+      const v = c[2](r);
+      if (i === 0) return `<td>${v}</td>`;
+      const good = c[0] === "calibration_error" ? null : c[0] === "coverage" ? Math.abs(v - 0.8) <= 0.08 : c[0] === "direction_hit_rate" ? v > 0.5 : c[0] === "live_change" ? null : v > 0;
+      return `<td class="${good == null || v == null ? "" : good ? "good" : "bad"}">${c[3](v)}</td>`;
+    }).join("") + "</tr>";
+  }).join("");
+  $("lb-table").innerHTML = `<table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
+}
+
+$("lb-table").addEventListener("click", (e) => {
+  const th = e.target.closest("th");
+  if (th) { lb.sort = th.dataset.k; renderLeaderboard(); return; }
+  const tr = e.target.closest("tr[data-s]");
+  if (tr) {
+    $("symbol").value = tr.dataset.s;
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    runBacktest();
+  }
+});
+
+async function runLeaderboard(ev) {
+  ev.preventDefault();
+  const el = $("lb-error");
+  el.hidden = true;
+  saveForm();
+  const body = formBody();
+  body.symbols = $("lb-symbols").value;
+  $("lb-run").disabled = true;
+  $("lb-progress").textContent = "Submitting…";
+  try {
+    const result = await runJob("/api/leaderboard", body, (job) => ($("lb-progress").textContent = phaseLabel(job)));
+    lb.rows = result.rows;
+    lb.trend = result.params.trend_window > 0;
+    const p = result.params;
+    $("lb-progress").textContent =
+      `${result.model.split("/").pop()} · ${result.interval} · ${p.max_origins} origins, ${p.horizon}-bar horizon` +
+      (p.covariates ? ", volume covariates" : "") +
+      (lb.trend ? `, ${p.trend_window}-bar trend` : "") + " · click a row to replay it";
+    renderLeaderboard();
+  } catch (e) {
+    el.hidden = false;
+    el.textContent = e.message;
+    $("lb-progress").textContent = "";
+  } finally {
+    $("lb-run").disabled = false;
+  }
+}
+
 // ---------- wiring ----------
 
 function setView(v) {
@@ -776,6 +1060,7 @@ function setView(v) {
 }
 
 $("run-form").addEventListener("submit", runBacktest);
+$("lb-form").addEventListener("submit", runLeaderboard);
 $("play").addEventListener("click", () => play(!state.playing));
 $("restart").addEventListener("click", () => { setPlayhead(state.data.start); state.cam = null; play(true); });
 $("scrub").addEventListener("input", (e) => {
@@ -806,6 +1091,7 @@ window.addEventListener("resize", () => { state.cam = null; });
   // Shareable links: #symbol=ETHUSDT&interval=4h&horizon=12&run fills the form (and runs it).
   const hash = new URLSearchParams(location.hash.slice(1));
   for (const f of FORM_FIELDS) if (hash.has(f)) $(f).value = hash.get(f);
+  if (hash.has("covariates")) $("covariates").checked = hash.get("covariates") !== "0";
   if (hash.get("view") === "full") setView("full");
   loadSymbols();
   requestAnimationFrame(frame);

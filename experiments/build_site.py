@@ -117,12 +117,16 @@ def build_pages() -> None:
         "risk": ("risk.md", DOCS / "risk" / "index.html", "../",
                  "Timestral against GARCH, EWMA and historical simulation as a crypto risk model: better ranges, "
                  "trustworthy Value-at-Risk, and no proven trading edge yet."),
+        "options": ("options.md", DOCS / "options" / "index.html", "../",
+                    "Extra inputs barely help Timestral, but it forecasts next-day crypto volatility better than the "
+                    "options market's own index and spots expensive options better than GARCH."),
     }
     for name, (src, out, root, description) in pages.items():
         md = (DOCS / src).read_text()
-        md = rewrite_links(md, {"paper": root or "./", "risk": f"{root}risk/"}, figures=f"{root}figures/", demo=f"{root}demo/")
+        md = rewrite_links(md, {"paper": root or "./", "risk": f"{root}risk/", "options": f"{root}options/"},
+                           figures=f"{root}figures/", demo=f"{root}demo/")
         title = next(line[2:] for line in md.splitlines() if line.startswith("# "))
-        nav = (f'<a href="{root or "./"}">Part 1</a><a href="{root}risk/">Part 2</a>'
+        nav = (f'<a href="{root or "./"}">Part 1</a><a href="{root}risk/">Part 2</a><a href="{root}options/">Part 3</a>'
                f'<a href="{root}demo/">Interactive demo</a><a href="{REPO_URL}">Code on GitHub</a>')
         html = render(md, title=title, nav=nav)
         html = html.replace("<title>", f'<meta name="description" content="{description}"><title>', 1)

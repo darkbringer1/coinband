@@ -296,6 +296,11 @@ uv run python experiments/phase1/skew_check.py
 
 The forecasts are cached in `experiments/results/phase1/`, the summary in `summary.md` and `summary.json` there.
 
+## Next
+
+[Part 3: Better inputs, and a match against the options market](options.md) tests whether extra data improves the
+forecasts, and how Timestral compares with the volatility that option prices imply.
+
 ## Words used here
 
 - **Volatility**: how big the price swings are, regardless of direction.

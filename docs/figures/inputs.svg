@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 400" width="960" height="400" font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif" font-size="12">
+<rect width="960" height="400" fill="#fcfcfb"/>
+<text x="24" y="28" font-size="15" font-weight="600" fill="#1a1a19">What extra inputs do to Timestral's forecast ranges</text>
+<text x="24" y="46" fill="#52514e">CRPS skill vs plain Timestral (price only), average over 1 to 24 hours ahead, with 90% intervals. Right of 0: the input helps.</text>
+<line x1="282.1" y1="90" x2="282.1" y2="320" stroke="#e4e3df"/>
+<text x="282.1" y="338" text-anchor="middle" fill="#52514e">-1.0%</text>
+<line x1="362.5" y1="90" x2="362.5" y2="320" stroke="#e4e3df"/>
+<text x="362.5" y="338" text-anchor="middle" fill="#52514e">-0.5%</text>
+<line x1="442.9" y1="90" x2="442.9" y2="320" stroke="#e4e3df"/>
+<text x="442.9" y="338" text-anchor="middle" fill="#52514e">+0.0%</text>
+<line x1="523.2" y1="90" x2="523.2" y2="320" stroke="#e4e3df"/>
+<text x="523.2" y="338" text-anchor="middle" fill="#52514e">+0.5%</text>
+<line x1="603.6" y1="90" x2="603.6" y2="320" stroke="#e4e3df"/>
+<text x="603.6" y="338" text-anchor="middle" fill="#52514e">+1.0%</text>
+<line x1="683.9" y1="90" x2="683.9" y2="320" stroke="#e4e3df"/>
+<text x="683.9" y="338" text-anchor="middle" fill="#52514e">+1.5%</text>
+<line x1="442.9" y1="86" x2="442.9" y2="324" stroke="#1a1a19" stroke-width="1.5"/>
+<text x="446.9" y="82" fill="#1a1a19">no change</text>
+<text x="234" y="114" text-anchor="end" fill="#1a1a19">Market leader (BTC/ETH)</text>
+<line x1="542.4" y1="103" x2="645.1" y2="103" stroke="#eb6834" stroke-width="2"/>
+<circle cx="594.7" cy="103" r="5" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"/>
+<text x="714" y="107" fill="#52514e">tuning +0.94%</text>
+<line x1="385.8" y1="117" x2="476.1" y2="117" stroke="#2a78d6" stroke-width="2"/>
+<circle cx="441.2" cy="117" r="5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<text x="714" y="121" fill="#52514e">held-out -0.01%</text>
+<text x="234" y="160" text-anchor="end" fill="#1a1a19">Funding rate</text>
+<line x1="413.5" y1="149" x2="443.1" y2="149" stroke="#eb6834" stroke-width="2"/>
+<circle cx="428.0" cy="149" r="5" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"/>
+<text x="714" y="153" fill="#52514e">tuning -0.09%</text>
+<line x1="393.0" y1="163" x2="422.5" y2="163" stroke="#2a78d6" stroke-width="2"/>
+<circle cx="408.5" cy="163" r="5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<text x="714" y="167" fill="#52514e">held-out -0.21%</text>
+<text x="234" y="206" text-anchor="end" fill="#1a1a19">Hour and weekday</text>
+<line x1="395.1" y1="195" x2="454.1" y2="195" stroke="#eb6834" stroke-width="2"/>
+<circle cx="425.7" cy="195" r="5" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"/>
+<text x="714" y="199" fill="#52514e">tuning -0.11%</text>
+<line x1="309.6" y1="209" x2="395.7" y2="209" stroke="#2a78d6" stroke-width="2"/>
+<circle cx="357.3" cy="209" r="5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<text x="714" y="213" fill="#52514e">held-out -0.53%</text>
+<text x="234" y="252" text-anchor="end" fill="#1a1a19">Volume</text>
+<line x1="452.1" y1="241" x2="552.8" y2="241" stroke="#eb6834" stroke-width="2"/>
+<circle cx="504.1" cy="241" r="5" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"/>
+<text x="714" y="245" fill="#52514e">tuning +0.38%</text>
+<line x1="352.9" y1="255" x2="453.4" y2="255" stroke="#2a78d6" stroke-width="2"/>
+<circle cx="409.9" cy="255" r="5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<text x="714" y="259" fill="#52514e">held-out -0.20%</text>
+<text x="234" y="298" text-anchor="end" fill="#1a1a19">All of them</text>
+<line x1="331.5" y1="287" x2="496.9" y2="287" stroke="#eb6834" stroke-width="2"/>
+<circle cx="425.9" cy="287" r="5" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"/>
+<text x="714" y="291" fill="#52514e">tuning -0.11%</text>
+<line x1="139.5" y1="301" x2="325.6" y2="301" stroke="#2a78d6" stroke-width="2"/>
+<circle cx="246.8" cy="301" r="5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<text x="714" y="305" fill="#52514e">held-out -1.22%</text>
+<circle cx="250" cy="360" r="5" fill="#eb6834"/>
+<text x="260" y="364" fill="#1a1a19">Tuning half (Oct 2025 to May 2026)</text>
+<circle cx="550" cy="360" r="5" fill="#2a78d6"/>
+<text x="560" y="364" fill="#1a1a19">Held-out half (May to Nov 2026)</text>
+</svg>

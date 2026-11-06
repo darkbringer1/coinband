@@ -142,7 +142,7 @@ def render_fragment(markdown: str) -> str:
 
 
 # article name -> (markdown file, URL path in the app)
-ARTICLES = {"paper": ("paper.md", "/paper"), "risk": ("risk.md", "/paper/risk")}
+ARTICLES = {"paper": ("paper.md", "/paper"), "risk": ("risk.md", "/paper/risk"), "options": ("options.md", "/paper/options")}
 
 
 def rewrite_links(md: str, base: dict[str, str], figures: str, demo: str) -> str:
@@ -163,7 +163,8 @@ def paper_html(name: str = "paper") -> str | None:
     base = {n: url for n, (_, url) in ARTICLES.items()}
     md = rewrite_links(path.read_text(), base, figures="/paper/figures/", demo="/")  # the app is the demo here
     title = next((ln[2:] for ln in md.splitlines() if ln.startswith("# ")), "coinband paper")
-    nav = '<a href="/">&larr; back to coinband</a><a href="/paper">Part 1</a><a href="/paper/risk">Part 2</a>'
+    nav = ('<a href="/">&larr; back to coinband</a><a href="/paper">Part 1</a><a href="/paper/risk">Part 2</a>'
+           '<a href="/paper/options">Part 3</a>')
     return render(md, title=title, nav=nav)
 
 

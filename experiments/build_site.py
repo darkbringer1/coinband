@@ -98,7 +98,7 @@ def build_pages() -> None:
     shutil.copy(STATIC / "app.js", DEMO / "app.js")
     shutil.copy(STATIC / "style.css", DEMO / "style.css")
     page = (STATIC / "index.html").read_text()
-    config = json.dumps({"index": "data/index.json", "article": "../", "repo": REPO_URL})
+    config = json.dumps({"index": "data/index.json", "article": "../", "lab": "../lab/", "repo": REPO_URL})
     page = (
         page.replace('href="/style.css"', 'href="style.css"')
         .replace('<script src="/app.js"></script>', f"<script>window.COINBAND_STATIC = {config};</script>\n  <script src=\"app.js\"></script>")
@@ -127,7 +127,8 @@ def build_pages() -> None:
                            figures=f"{root}figures/", demo=f"{root}demo/")
         title = next(line[2:] for line in md.splitlines() if line.startswith("# "))
         nav = (f'<a href="{root or "./"}">Part 1</a><a href="{root}risk/">Part 2</a><a href="{root}options/">Part 3</a>'
-               f'<a href="{root}demo/">Interactive demo</a><a href="{REPO_URL}">Code on GitHub</a>')
+               f'<a href="{root}demo/">Interactive demo</a><a href="{root}lab/">Lab: check the results</a>'
+               f'<a href="{REPO_URL}">Code on GitHub</a>')
         html = render(md, title=title, nav=nav)
         html = html.replace("<title>", f'<meta name="description" content="{description}"><title>', 1)
         out.parent.mkdir(parents=True, exist_ok=True)

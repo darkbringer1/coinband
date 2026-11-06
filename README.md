@@ -7,6 +7,8 @@ Binance coin (or stock, index, FX pair), then watch its forecast band play out a
 
 - **Read the study:** <https://darkbringer1.github.io/coinband/> (three parts, written for general readers)
 - **Try the demo in your browser:** <https://darkbringer1.github.io/coinband/demo/> (no install, precomputed runs)
+- **Check the results yourself:** <https://darkbringer1.github.io/coinband/lab/> (Timestral vs GARCH risk lines and
+  volatility forecasts, hour by hour)
 - **Run it on your machine:** see [Quick start](#quick-start) below
 
 ## What you get
@@ -143,6 +145,9 @@ Ground rules (the full list is in [CLAUDE.md](CLAUDE.md)):
 - `docs/index.html`, `docs/risk/`, `docs/options/`: the three parts, rendered from the `.md` files
 - `docs/demo/`: a copy of `coinband/static` in static mode, replaying precomputed Timestral-209M runs for eight
   Binance coins from `docs/demo/data/`
+- `docs/lab/`: the hand-written Lab page (`index.html`, `lab.js`, `lab.css`, edit these directly); its data in
+  `docs/lab/data/` comes from `uv run python experiments/build_lab.py` (needs the phase 1 forecasts). Deribit DVOL
+  data must not go into `docs/`: Deribit's terms restrict redistribution.
 
 The HTML is generated. Do not edit it by hand; edit the `.md` files or `coinband/static/` and rebuild:
 

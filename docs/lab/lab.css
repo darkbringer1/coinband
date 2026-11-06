@@ -1,0 +1,32 @@
+.lab-nav { display: flex; gap: 16px; flex-wrap: wrap; font-size: 13px; }
+.lab-nav a { color: var(--band); }
+main.lab { display: flex; flex-direction: column; gap: 20px; max-width: 1200px; grid-template-columns: none; }
+.intro h1 { font-size: 24px; margin: 4px 0 10px; }
+.intro p, .panel p { color: #c5cfdb; max-width: 900px; }
+.intro a, .panel a { color: var(--band); }
+.cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 14px; }
+@media (max-width: 900px) { .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 12px; }
+.card .k { color: var(--muted); font-size: 12px; }
+.card .v { font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; margin: 2px 0; }
+.card .s { color: var(--muted); font-size: 12px; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; }
+.panel h2 { font-size: 17px; margin: 0; }
+.panel-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
+.controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.controls label { flex-direction: row; align-items: center; gap: 6px; font-size: 13px; }
+.chart-wrap { position: relative; }
+.chart-wrap canvas { display: block; width: 100%; aspect-ratio: 16 / 7; }
+.chart-wrap.short canvas { aspect-ratio: 16 / 4; }
+#risk-scrub { width: 100%; margin: 8px 0; accent-color: var(--accent); padding: 0; }
+.stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+@media (max-width: 900px) { .stats { grid-template-columns: 1fr; } }
+.stat { background: var(--panel-2); border-radius: 6px; padding: 8px 12px; font-size: 13px; font-variant-numeric: tabular-nums; }
+.stat .name { font-weight: 600; display: flex; align-items: center; gap: 8px; }
+.stat .sw { width: 12px; height: 3px; border-radius: 2px; display: inline-block; }
+.stat .row { display: flex; justify-content: space-between; color: var(--muted); }
+.stat .row b { color: var(--text); font-weight: 500; }
+.note { font-size: 13px; color: var(--muted) !important; }
+.tip { position: absolute; pointer-events: none; background: #0d1117; border: 1px solid var(--line); border-radius: 6px;
+  padding: 6px 8px; font-size: 12px; white-space: nowrap; font-variant-numeric: tabular-nums; z-index: 2; }
+.tip .sw { display: inline-block; width: 10px; height: 3px; border-radius: 2px; margin-right: 6px; vertical-align: middle; }

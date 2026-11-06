@@ -1,0 +1,103 @@
+{
+ "pairs": [
+  "BTCUSDT",
+  "ETHUSDT",
+  "SOLUSDT",
+  "BNBUSDT",
+  "XRPUSDT",
+  "DOGEUSDT",
+  "ADAUSDT",
+  "LINKUSDT"
+ ],
+ "generated": "2026-11-06",
+ "start": 1777622400000,
+ "end": 1793880000000,
+ "headline": {
+  "crps_vs_garch": {
+   "steps": {
+    "1": 0.0027186063556645657,
+    "8": 0.00790125351269888,
+    "24": 0.006568718450532529
+   },
+   "avg": 0.006915018273524365,
+   "ci": [
+    0.003979746137613533,
+    0.010114469521194413
+   ],
+   "qlike_base": 0.39948484685242464,
+   "qlike_timestral": 0.4310466827494489
+  },
+  "blend_vs_garch": {
+   "steps": {
+    "1": 0.005641057467913546,
+    "8": 0.006628363420533967,
+    "24": 0.006020565747819839
+   },
+   "avg": 0.006182082161689251,
+   "ci": [
+    0.004813794089733819,
+    0.007834598402741939
+   ],
+   "qlike_base": 0.39948484685242464,
+   "qlike_timestral": 0.37014241818709614
+  },
+  "var": {
+   "timestral": {
+    "hit_rate": 0.010322116448970554,
+    "kupiec_p_median": 0.42250863025335383,
+    "christoffersen_p_median": 0.3746400571949571,
+    "qloss": 0.00022115173056542882,
+    "kupiec_rejections": 0,
+    "5": {
+     "hit_rate": 0.05282820456054904,
+     "kupiec_p_median": 0.33982089315407515,
+     "christoffersen_p_median": 0.8855420736360851,
+     "qloss": 0.0006565550958897055,
+     "kupiec_rejections": 1
+    }
+   },
+   "garch": {
+    "hit_rate": 0.007720832410892185,
+    "kupiec_p_median": 0.11791533226378983,
+    "christoffersen_p_median": 0.4597446980491092,
+    "qloss": 0.00022824905679109887,
+    "kupiec_rejections": 3,
+    "5": {
+     "hit_rate": 0.03760792561434581,
+     "kupiec_p_median": 0.00041702961714603,
+     "christoffersen_p_median": 0.3902390553258357,
+     "qloss": 0.0006788472203695169,
+     "kupiec_rejections": 8
+    }
+   },
+   "blend": {
+    "hit_rate": 0.00827429709984503,
+    "kupiec_p_median": 0.15514020538233494,
+    "christoffersen_p_median": 0.4532577854586197,
+    "qloss": 0.00022244922200366501,
+    "kupiec_rejections": 2,
+    "5": {
+     "hit_rate": 0.04258910781492141,
+     "kupiec_p_median": 0.016771847572588386,
+     "christoffersen_p_median": 0.4497889477260639,
+     "qloss": 0.0006611840285057378,
+     "kupiec_rejections": 6
+    }
+   },
+   "ewma": {
+    "hit_rate": 0.010405136152313484,
+    "kupiec_p_median": 0.4597152520840984,
+    "christoffersen_p_median": 0.30547757474115844,
+    "qloss": 0.00023162528975628408,
+    "kupiec_rejections": 0,
+    "5": {
+     "hit_rate": 0.04848350675226921,
+     "kupiec_p_median": 0.6648306433504289,
+     "christoffersen_p_median": 0.01320820172460873,
+     "qloss": 0.0006759991334224073,
+     "kupiec_rejections": 0
+    }
+   }
+  }
+ }
+}

@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Interactive results: Timestral against GARCH as a crypto risk model, hour by hour and day by day.">
+  <title>coinband lab: Timestral vs GARCH, replayed</title>
+  <link rel="stylesheet" href="../demo/style.css">
+  <link rel="stylesheet" href="lab.css">
+</head>
+<body>
+  <header>
+    <div class="brand">coinband lab</div>
+    <nav class="lab-nav">
+      <a href="../">Part 1</a><a href="../risk/">Part 2</a><a href="../options/">Part 3</a>
+      <a href="../demo/">Forecast demo</a><a href="https://github.com/darkbringer1/coinband">Code</a>
+    </nav>
+    <div class="disclaimer">Unofficial. Not affiliated with Mistral AI or Binance. Not financial advice.</div>
+  </header>
+
+  <main class="lab">
+    <section class="intro">
+      <h1>Is an AI forecaster a better risk model? Check it yourself.</h1>
+      <p>Every hour from <span id="span-dates">May to November 2026</span>, Mistral's Timestral and GARCH, the
+        standard statistical volatility model, each drew a line under the price: "the price should fall below this
+        only 1 hour in 100" (or 1 in 20). GARCH was tuned on the six months before; Timestral was used as released.
+        Scrub through the months below and count the breaches yourself.
+        The full story is in <a href="../risk/">part 2</a>.</p>
+      <div class="cards" id="cards"></div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2>1. Risk lines, hour by hour</h2>
+        <div class="controls">
+          <label>Coin <select id="risk-pair"></select></label>
+          <div class="seg" role="group" aria-label="Level">
+            <button type="button" id="lvl-01" class="on">1 in 100 hours</button>
+            <button type="button" id="lvl-05">1 in 20 hours</button>
+          </div>
+          <label>Window <select id="risk-window">
+            <option value="72">3 days</option>
+            <option value="168" selected>1 week</option>
+            <option value="720">1 month</option>
+            <option value="100000">everything</option>
+          </select></label>
+          <button type="button" id="risk-play">Play</button>
+        </div>
+      </div>
+      <div class="chart-wrap"><canvas id="risk-chart"></canvas><div class="tip" hidden></div></div>
+      <input type="range" id="risk-scrub" min="0" max="1000" value="1000" aria-label="Position in time">
+      <div class="stats" id="risk-stats"></div>
+      <p class="note">Each line is drawn one hour ahead from the prices known at that time; a dot marks an hour that
+        closed below that model's line. A good risk model is crossed about as often as it promises: 1 in 100 hours
+        (1%) or 1 in 20 (5%). Fewer crossings mean it is overcautious, more mean it underestimates risk.
+        "Average miss" is the quantile loss: how far, on average, the price landed on the wrong side, weighted the
+        way the target level implies. Lower is better.</p>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2>2. The volatility race, day by day</h2>
+        <div class="controls">
+          <label>Coin <select id="vol-pair"></select></label>
+        </div>
+      </div>
+      <div class="chart-wrap"><canvas id="vol-chart"></canvas><div class="tip" hidden></div></div>
+      <div class="chart-wrap short"><canvas id="race-chart"></canvas><div class="tip" hidden></div></div>
+      <p class="note">Top: each day's actual volatility over the next 24 hours (annualized) and what each model expected
+        at the start of the day. Bottom: the running average of each model's forecast error for volatility (QLIKE),
+        so the lowest line is winning. The blend is the average of Timestral's and GARCH's forecast ranges.</p>
+    </section>
+
+    <section class="panel">
+      <h2>3. And against the options market?</h2>
+      <p>For Bitcoin and Ether we also compared Timestral with Deribit's DVOL, the volatility that option prices
+        imply. Timestral forecast the next day's volatility better than DVOL and carried information DVOL had not
+        priced in. Deribit's terms do not allow republishing its data, so that comparison lives in
+        <a href="../options/">part 3</a> as summary statistics only.</p>
+    </section>
+  </main>
+
+  <script src="lab.js"></script>
+</body>
+</html>

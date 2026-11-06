@@ -1339,6 +1339,10 @@ async function staticInit() {
   const link = document.querySelector(".paper-link");
   link.href = S.article;
   link.textContent = "Read the article";
+  if (S.lab) {
+    const lab = Object.assign(document.createElement("a"), { href: S.lab, className: "paper-link", textContent: "Lab: check the results" });
+    link.after(lab);
+  }
   lb.rows = runs.map((r) => ({ symbol: r.symbol, summary: r.summary, live_change: r.live_change, file: r.file }));
   lb.trend = false;
   renderLeaderboard();

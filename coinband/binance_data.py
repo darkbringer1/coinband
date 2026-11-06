@@ -12,7 +12,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 BASE_URLS = ("https://data-api.binance.vision", "https://api.binance.com")
 PAGE_LIMIT = 1000
@@ -56,6 +56,8 @@ class Klines:
     low: list[float]
     close: list[float]
     volume: list[float]
+    # source metadata: name, currency, exchange, timezone, continuous (trades 24/7), price, price_time
+    info: dict = field(default_factory=dict)
 
     def __len__(self) -> int:
         return len(self.close)
@@ -161,6 +163,7 @@ def fetch_klines(
     unique = unique[-bars:]
     if not unique:
         raise BinanceError(f"no closed candles for {symbol} {interval}")
+    info = {"name": symbol, "currency": None, "exchange": "Binance", "timezone": "UTC", "continuous": True}
     return Klines(
         symbol=symbol,
         interval=interval,
@@ -170,4 +173,11 @@ def fetch_klines(
         low=[float(r[3]) for r in unique],
         close=[float(r[4]) for r in unique],
         volume=[float(r[5]) for r in unique],
+        info=info,
     )
+
+
+def current_price(symbol: str, fetch=_get_json) -> dict:
+    """Latest trade price; `time` is when it was fetched (Binance does not return one here)."""
+    d = fetch("/api/v3/ticker/price", {"symbol": symbol.upper()})
+    return {"price": float(d["price"]), "time": int(time.time() * 1000)}

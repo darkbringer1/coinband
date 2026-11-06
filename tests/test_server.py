@@ -18,7 +18,7 @@ def fake_klines(symbol, interval, bars, progress=None):
     t = [i * 3_600_000 for i in range(bars)]
     if progress:
         progress(bars, bars)
-    return Klines(symbol, interval, t, close, close, close, close, [1.0] * bars)
+    return Klines(symbol, interval, t, close, close, close, close, [1.0] * bars, {"continuous": True})
 
 
 @pytest.fixture()
@@ -107,7 +107,7 @@ def wait_job(server, job_id):
     for _ in range(200):
         _, _, raw = get(f"{server}/api/jobs/{job_id}")
         job = json.loads(raw)
-        if job["status"] in ("done", "error"):
+        if job["status"] in ("done", "error", "cancelled"):
             return job
         time.sleep(0.05)
     raise AssertionError("job did not finish")
@@ -153,3 +153,82 @@ def test_offload_moves_nested_tensors():
     off = Offload(lin, "cpu")
     x = torch.ones(1, 2)
     assert torch.allclose(off(x), lin(x))
+
+
+def test_paper_page(server):
+    status, ctype, body = get(f"{server}/paper")
+    assert status == 200 and ctype.startswith("text/html")
+    assert b"<h1 id=" in body and b"<table>" in body and b"<details>" in body and b"/paper/figures/skill-by-horizon.svg" in body
+    status, ctype, _ = get(f"{server}/paper/figures/skill-by-horizon.svg")
+    assert status == 200 and "svg" in ctype
+    with pytest.raises(urllib.error.HTTPError):
+        get(f"{server}/paper/figures/..%2f..%2fREADME.md")
+
+
+def test_live_endpoint_returns_new_bars_and_forecast(server):
+    # the fake source returns context + 8 = 136 hourly bars, the newest opening at hour 135
+    status, body = post(f"{server}/api/live", {"symbol": "BTCUSDT", "context": 128, "horizon": 6, "since": 3_600_000 * 133})
+    assert status == 200
+    assert body["new_bars"]["time"] == [3_600_000 * 134, 3_600_000 * 135]
+    assert len(body["live"]["bands"]) == 6 and len(body["future_time"]) == 6
+    assert body["future_time"][0] == body["last_time"] + 3_600_000
+
+
+def test_markets_and_yahoo_symbols(server):
+    _, _, raw = get(f"{server}/api/markets")
+    markets = json.loads(raw)
+    assert set(markets) == {"binance", "yahoo"} and "1d" in markets["yahoo"]["intervals"]
+    _, _, raw = get(f"{server}/api/symbols?source=yahoo")
+    syms = [s["symbol"] for s in json.loads(raw)["symbols"]]
+    assert "^NDX" in syms and "XU100.IS" in syms
+
+
+def test_parse_request_by_source():
+    r = parse_request({"source": "yahoo", "symbol": "xu100.is", "interval": "1d"})
+    assert r["symbol"] == "XU100.IS" and r["source"] == "yahoo"
+    with pytest.raises(ValueError):
+        parse_request({"source": "yahoo", "symbol": "AAPL", "interval": "4h"})
+    with pytest.raises(ValueError):
+        parse_request({"source": "nasdaq", "symbol": "AAPL"})
+
+
+class SlowForecaster(FakeForecaster):
+    def forecast(self, context, prediction_length, past_covariates=None, known_covariates=None):
+        time.sleep(0.3)
+        return super().forecast(context, prediction_length, past_covariates, known_covariates)
+
+
+@pytest.fixture()
+def slow_server():
+    app = App(
+        ModelCache("cpu", loader=lambda model_id, device: SlowForecaster()),
+        klines_fetcher=fake_klines,
+        symbols_fetcher=lambda: [],
+    )
+    httpd = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(app))
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    yield f"http://127.0.0.1:{httpd.server_address[1]}"
+    httpd.shutdown()
+    httpd.server_close()
+
+
+def test_queue_and_cancel(slow_server):
+    body = {"symbol": "BTCUSDT", "bars": 2000, "horizon": 8, "max_origins": 2000, "context": 256}
+    _, first = post(f"{slow_server}/api/backtest", body)
+    _, second = post(f"{slow_server}/api/backtest", body)
+    for _ in range(100):
+        jobs = json.loads(get(f"{slow_server}/api/jobs")[2])["jobs"]
+        phases = {j["job_id"]: j["phase"] for j in jobs}
+        if phases.get(first["job_id"]) == "forecasting" and phases.get(second["job_id"]) == "waiting for model":
+            break
+        time.sleep(0.05)
+    waiting = next(j for j in jobs if j["job_id"] == second["job_id"])
+    assert waiting["position"] == 1 and "BTCUSDT" in waiting["label"]
+    # cancel the waiting one, then the running one
+    for job_id in (second["job_id"], first["job_id"]):
+        status, _ = post(f"{slow_server}/api/jobs/{job_id}/cancel", {})
+        assert status == 200
+        assert wait_job(slow_server, job_id)["status"] == "cancelled"
+    # the model is free again: a new job runs to completion
+    _, third = post(f"{slow_server}/api/backtest", {**body, "max_origins": 20})
+    assert wait_job(slow_server, third["job_id"])["status"] == "done"

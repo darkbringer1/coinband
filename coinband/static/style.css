@@ -168,3 +168,20 @@ tbody tr:hover { background: var(--panel-2); }
 #lb-symbols { flex: 1 1 320px; }
 .check-row { flex-direction: row; align-items: center; gap: 8px; font-size: 13px; color: var(--text); }
 .check-row input { margin: 0; }
+.paper-link { color: var(--band); font-size: 13px; }
+.run-row { display: flex; gap: 8px; }
+.run-row #run { flex: 1; }
+#cancel-run { border-color: var(--bad); color: var(--bad); }
+aside { display: flex; flex-direction: column; gap: 12px; }
+aside form { position: static; }
+.queue { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px; }
+.queue[hidden] { display: none; }
+.queue h3 { font-size: 13px; margin: 0 0 8px; }
+.queue ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.queue li { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; font-size: 12px; }
+.queue .q-label { color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.queue .q-state { color: var(--muted); grid-column: 1; }
+.queue .q-state.bad { color: var(--bad); }
+.queue button { grid-row: 1 / span 2; grid-column: 2; align-self: center; padding: 3px 8px; font-size: 12px; }
+.queue .q-bar { grid-column: 1; height: 3px; background: var(--panel-2); border-radius: 2px; overflow: hidden; }
+.queue .q-bar > div { height: 100%; background: var(--band); }

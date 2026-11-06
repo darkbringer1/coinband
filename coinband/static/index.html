@@ -9,22 +9,27 @@
 <body>
   <header>
     <div class="brand">coinband</div>
-    <div class="tagline">Walk-forward backtest of Timestral forecasts on Binance pairs</div>
+    <div class="tagline">Walk-forward backtest of Timestral forecasts on crypto, stocks and indices</div>
+    <a class="paper-link" href="/paper">Read the study</a>
     <div class="disclaimer">Unofficial. Not affiliated with Mistral AI or Binance. Not financial advice.</div>
   </header>
 
   <main>
     <aside>
       <form id="run-form" autocomplete="off">
-        <label>Pair
+        <label>Market
+          <select id="source" name="source">
+            <option value="binance" selected>Crypto (Binance)</option>
+            <option value="yahoo">Stocks, indices, FX (Yahoo)</option>
+          </select>
+        </label>
+        <label>Symbol
           <input id="symbol" name="symbol" list="symbols" value="BTCUSDT" spellcheck="false" required>
           <datalist id="symbols"></datalist>
         </label>
         <label>Interval
           <select id="interval" name="interval">
-            <option>1m</option><option>5m</option><option>15m</option><option>30m</option>
-            <option selected>1h</option><option>2h</option><option>4h</option><option>6h</option>
-            <option>12h</option><option>1d</option><option>1w</option>
+            <option selected>1h</option>
           </select>
         </label>
         <label>Model
@@ -57,7 +62,10 @@
         <label class="check-row" title="Feed log volume and the absolute 1-bar return as past covariates. Helped 1 to 6 bars ahead, hurt 24+ in one of two test periods; about 6x slower.">
           <input id="covariates" type="checkbox"> Volume covariates
         </label>
-        <button id="run" type="submit">Run backtest</button>
+        <div class="run-row">
+          <button id="run" type="submit">Run backtest</button>
+          <button id="cancel-run" type="button" hidden>Cancel</button>
+        </div>
         <div id="progress" class="progress" hidden>
           <div class="bar"><div id="progress-fill"></div></div>
           <div id="progress-text"></div>
@@ -70,6 +78,10 @@
           <em>Trend window</em> &gt; 0 adds the recent drift to every forecast; the plain forecast is scored next to it.
         </p>
       </form>
+      <section class="queue" id="queue" hidden>
+        <h3>Queue <span class="muted">one job uses the model at a time</span></h3>
+        <ul id="queue-list"></ul>
+      </section>
     </aside>
 
     <section class="stage">
@@ -99,6 +111,8 @@
         </div>
         <label class="check"><input id="trail" type="checkbox" checked> Trail</label>
         <button id="record" title="Record the playback to .webm" disabled>Record .webm</button>
+        <label class="check" title="Every 60 s: fetch new closed bars and the current price, and redo the live forecast"><input id="live" type="checkbox" disabled> Live</label>
+        <span id="live-status" class="muted"></span>
       </div>
 
       <div class="metrics" id="metrics">
@@ -133,9 +147,9 @@
       </section>
 
       <section class="leaderboard">
-        <h2>Leaderboard <span class="sub">same settings, several pairs</span></h2>
+        <h2>Leaderboard <span class="sub">same settings, several symbols</span></h2>
         <form id="lb-form" class="lb-form" autocomplete="off">
-          <input id="lb-symbols" value="BTCUSDT ETHUSDT SOLUSDT BNBUSDT XRPUSDT DOGEUSDT" spellcheck="false" aria-label="Pairs">
+          <input id="lb-symbols" value="BTCUSDT ETHUSDT SOLUSDT BNBUSDT XRPUSDT DOGEUSDT" spellcheck="false" aria-label="Symbols">
           <button id="lb-run" type="submit">Run leaderboard</button>
           <span id="lb-progress" class="muted"></span>
         </form>

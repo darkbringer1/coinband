@@ -29,10 +29,11 @@ class FakeForecaster:
         self.calls = []
         self.covariates = []
 
-    def forecast(self, context, prediction_length, past_covariates=None):
+    def forecast(self, context, prediction_length, past_covariates=None, known_covariates=None):
         context = np.asarray(context)
         self.calls.append(context.copy())
         self.covariates.append(None if past_covariates is None else np.asarray(past_covariates).copy())
+        self.known = None if known_covariates is None else np.asarray(known_covariates).copy()
         b = context.shape[0]
         last = np.array([row[0][np.isfinite(row[0])][-1] for row in context])
         offsets = np.array([(q - 0.5) * 2 * self.spread for q in LEVELS])
@@ -227,3 +228,17 @@ def test_covariates_are_aligned_with_the_context():
 def test_covariates_need_volume():
     with pytest.raises(ValueError, match="volume"):
         run_backtest(FakeForecaster(), np.ones(100), BacktestParams(context=32, horizon=4, min_context=16, covariates=True))
+
+
+def test_extra_past_and_known_covariates():
+    close = 100 + np.arange(200.0)
+    past = np.vstack([np.arange(200.0), -np.arange(200.0)])
+    known = np.arange(200.0 + 4)[None, :]  # covers the horizon after the data end
+    fc = FakeForecaster()
+    params = BacktestParams(context=32, horizon=4, stride=50, min_context=16)
+    run_backtest(fc, close, params, past_covariates=past, known_covariates=known)
+    i = origin_indices(200, params)[-1]
+    np.testing.assert_allclose(fc.covariates[-1][-1, 0], np.arange(i - 32, i))
+    np.testing.assert_allclose(fc.known[-1, 0], np.arange(i - 32, i + 4))
+    with pytest.raises(ValueError, match="known_covariates"):
+        run_backtest(fc, close, params, known_covariates=np.zeros((1, 200)))

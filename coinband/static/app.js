@@ -20,10 +20,11 @@ const COLORS = {
   muted: "#8b98a8",
 };
 const L = { P05: 0, P10: 1, P50: 2, P90: 3, P95: 4 };
-const FORM_FIELDS = ["symbol", "interval", "model", "bars", "context", "horizon", "stride", "max_origins", "trend_window"];
+const FORM_FIELDS = ["source", "symbol", "interval", "model", "bars", "context", "horizon", "stride", "max_origins", "trend_window"];
 const NUMERIC_FIELDS = ["bars", "context", "horizon", "stride", "max_origins", "trend_window"];
 const SERIES = ["#3987e5", "#d95926"]; // analysis charts: validated on the dark surface
-const STORE_KEY = "coinband.form.v4";
+const STORE_KEY = "coinband.form.v5";
+const LIVE_EVERY_MS = 60_000;
 const AUTO_SECONDS = 30;
 const HOLD_SECONDS = 2; // pause on the live forecast at the end of a recording
 
@@ -56,13 +57,28 @@ function fmtPrice(v) {
 const pct = (v, d = 1) => (v == null || !isFinite(v) ? "–" : `${(v * 100).toFixed(d)}%`);
 const signedPct = (v, d = 2) => (v == null || !isFinite(v) ? "–" : `${v >= 0 ? "+" : ""}${(v * 100).toFixed(d)}%`);
 
+// Times are shown in the market's own time zone (UTC for crypto).
+const fmtCache = new Map();
+function fmtParts(ms, tz) {
+  let f = fmtCache.get(tz);
+  if (!f) {
+    f = new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+    fmtCache.set(tz, f);
+  }
+  const p = Object.fromEntries(f.formatToParts(new Date(ms)).map((x) => [x.type, x.value]));
+  return p;
+}
+function marketTz() { return state.data?.info?.timezone || "UTC"; }
 function fmtTime(ms, intervalMs, withDate = true) {
-  const d = new Date(ms);
-  const pad = (n) => String(n).padStart(2, "0");
-  const date = `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
+  const p = fmtParts(ms, marketTz());
+  const date = `${p.year}-${p.month}-${p.day}`;
   if (intervalMs >= 86_400_000) return date;
-  const hm = `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`;
+  const hm = `${p.hour}:${p.minute}`;
   return withDate ? `${date.slice(5)} ${hm}` : hm;
+}
+function tzLabel() {
+  const tz = marketTz();
+  return tz === "UTC" ? "UTC" : tz.split("/").pop().replace("_", " ") + " time";
 }
 
 // ---------- API ----------
@@ -75,21 +91,40 @@ async function api(path, opts) {
   return body;
 }
 
-async function loadSymbols() {
+let MARKETS = {};
+const symbolCache = {};
+
+async function loadSymbols(source) {
   try {
-    const { symbols } = await api("/api/symbols");
-    const list = $("symbols");
+    if (!symbolCache[source]) symbolCache[source] = (await api(`/api/symbols?source=${source}`)).symbols;
+    if ($("source").value !== source) return;
     const frag = document.createDocumentFragment();
-    for (const s of symbols) {
+    for (const s of symbolCache[source]) {
       const o = document.createElement("option");
       o.value = s.symbol;
-      o.label = `${s.base} / ${s.quote}`;
+      o.label = s.base ? `${s.base} / ${s.quote}` : `${s.name} · ${s.group}`;
       frag.appendChild(o);
     }
-    list.replaceChildren(frag);
+    $("symbols").replaceChildren(frag);
   } catch (e) {
     console.warn("symbol list unavailable:", e.message);
   }
+}
+
+// Intervals, symbol list and leaderboard defaults follow the market; `keep` keeps valid current values.
+function applySource(keep = true) {
+  const source = $("source").value;
+  const m = MARKETS[source];
+  if (!m) return;
+  const sel = $("interval");
+  const prev = sel.value;
+  sel.replaceChildren(...m.intervals.map((iv) => Object.assign(document.createElement("option"), { value: iv, textContent: iv })));
+  sel.value = keep && m.intervals.includes(prev) ? prev : m.default_interval;
+  const sym = $("symbol");
+  const looksCrypto = /^[A-Z0-9]+(USDT|USDC|BTC|ETH|BNB|FDUSD|TRY|EUR)$/.test(sym.value);
+  if (!keep || (source === "yahoo" && looksCrypto) || (source === "binance" && /[.^=]/.test(sym.value))) sym.value = m.default_symbol;
+  if (!keep || !$("lb-symbols").dataset.touched) $("lb-symbols").value = m.leaderboard.join(" ");
+  loadSymbols(source);
 }
 
 async function loadModels() {
@@ -122,6 +157,7 @@ function restoreForm() {
       const el = $(f);
       if (el.tagName === "SELECT" && ![...el.options].some((o) => o.value === v[f])) continue;
       el.value = v[f];
+      if (f === "source") applySource(true);
     }
     if (typeof v.covariates === "boolean") $("covariates").checked = v.covariates;
   } catch { /* ignore */ }
@@ -161,19 +197,81 @@ function phaseLabel(job) {
 }
 
 // Submit a job and poll it to completion; `onProgress(job)` sees each status.
-async function runJob(path, body, onProgress) {
+const myJobs = { backtest: null, leaderboard: null };
+
+class Cancelled extends Error {}
+
+async function cancelJob(jobId) {
+  try {
+    await api(`/api/jobs/${jobId}/cancel`, { method: "POST" });
+  } catch (e) {
+    console.warn("cancel failed:", e.message);
+  }
+  refreshQueue();
+}
+
+async function runJob(path, body, onProgress, kind) {
   const { job_id } = await api(path, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  for (;;) {
-    await new Promise((r) => setTimeout(r, 400));
-    const job = await api(`/api/jobs/${job_id}`);
-    if (job.status === "error") throw new Error(job.error);
-    if (job.status === "done") return job.result;
-    onProgress(job);
+  if (kind) myJobs[kind] = job_id;
+  refreshQueue();
+  try {
+    for (;;) {
+      await new Promise((r) => setTimeout(r, 400));
+      const job = await api(`/api/jobs/${job_id}`);
+      if (job.status === "error") throw new Error(job.error);
+      if (job.status === "cancelled") throw new Cancelled("Cancelled");
+      if (job.status === "done") return job.result;
+      onProgress(job);
+    }
+  } finally {
+    if (kind && myJobs[kind] === job_id) myJobs[kind] = null;
+    refreshQueue();
   }
+}
+
+// ---------- queue ----------
+
+async function refreshQueue() {
+  if (window.COINBAND_STATIC) return;
+  let jobs = [];
+  try {
+    jobs = (await api("/api/jobs")).jobs;
+  } catch {
+    return;
+  }
+  const active = jobs.filter((j) => ["queued", "running", "cancelling"].includes(j.status));
+  const recent = jobs.filter((j) => !active.includes(j)).slice(0, 3);
+  const shown = active.concat(recent);
+  $("queue").hidden = shown.length === 0;
+  $("queue-list").replaceChildren(
+    ...shown.map((j) => {
+      const li = document.createElement("li");
+      const isActive = active.includes(j);
+      const frac = j.total ? j.done / j.total : 0;
+      const state = j.status === "cancelling" ? "cancelling…"
+        : !isActive ? j.status
+        : j.position > 0 ? `waiting · #${j.position} in line`
+        : phaseLabel(j);
+      li.innerHTML = `<span class="q-label"></span><span class="q-state"></span>` +
+        (isActive ? `<span class="q-bar"><div style="width:${Math.round(frac * 100)}%"></div></span>` : "");
+      li.querySelector(".q-label").textContent = j.label + (Object.values(myJobs).includes(j.job_id) ? " (this tab)" : "");
+      const st = li.querySelector(".q-state");
+      st.textContent = state;
+      if (j.status === "error" || j.status === "cancelled") st.classList.add("bad");
+      if (isActive && j.status !== "cancelling") {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.textContent = "Cancel";
+        b.onclick = () => cancelJob(j.job_id);
+        li.appendChild(b);
+      }
+      return li;
+    }),
+  );
 }
 
 async function runBacktest(ev) {
@@ -181,26 +279,33 @@ async function runBacktest(ev) {
   showError("");
   saveForm();
   const body = formBody();
-  $("run").disabled = true;
+  if (myJobs.backtest) cancelJob(myJobs.backtest); // a new run replaces this tab's previous one
+  $("cancel-run").hidden = false;
   setProgress("Submitting…", 0);
   try {
     const result = await runJob("/api/backtest", body, (job) =>
-      setProgress(phaseLabel(job), job.total ? job.done / job.total : 0),
-    );
+      setProgress(job.status === "cancelling" ? "Cancelling…" : phaseLabel(job), job.total ? job.done / job.total : 0),
+    "backtest");
     setProgress(`Done: ${result.origins.length} origins in ${result.inference_s}s`, 1);
     loadResult(result);
     loadModels().then(() => ($("model").value = body.model)).catch(() => {});
   } catch (e) {
-    showError(e.message);
-    $("progress").hidden = true;
+    if (e instanceof Cancelled) {
+      if (!myJobs.backtest) setProgress("Cancelled", 0);
+    } else {
+      showError(e.message);
+      $("progress").hidden = true;
+    }
   } finally {
-    $("run").disabled = false;
+    if (!myJobs.backtest) $("cancel-run").hidden = true;
   }
 }
 
 // ---------- data prep ----------
 
-function loadResult(r) {
+function loadResult(r, opts = {}) {
+  state.result = r;
+  if (!opts.live) { state.livePrice = null; stopLive(); }
   const n = r.close.length;
   const H = r.params.horizon;
   const origins = r.origins.map((o) => ({ ...o, end: o.index + H }));
@@ -241,16 +346,24 @@ function loadResult(r) {
   state.cam = null;
   state.playing = false;
   $("empty").hidden = true;
-  for (const id of ["play", "restart", "scrub", "record"]) $(id).disabled = false;
+  for (const id of ["play", "restart", "scrub", "record", "live"]) $(id).disabled = false;
   updateLive();
   renderAnalysis(state.data);
-  play(true);
+  if (opts.live) {
+    setPlayhead(state.data.end);
+    play(false);
+  } else {
+    play(true);
+  }
 }
 
 function timeAt(t) {
   const d = state.data;
   if (t < d.n) return d.time[Math.max(0, Math.floor(t))];
-  return d.time[d.n - 1] + (Math.floor(t) - d.n + 1) * d.interval_ms;
+  const k = Math.floor(t) - d.n;
+  const ft = d.future_time || [];
+  if (k < ft.length) return ft[k];
+  return (ft.length ? ft[ft.length - 1] : d.time[d.n - 1]) + (k - ft.length + 1) * d.interval_ms;
 }
 
 function currentOriginIndex(p) {
@@ -354,7 +467,14 @@ function updateLive() {
   const endBand = live.bands[d.H - 1];
   $("m-live").textContent = `${fmtPrice(endBand[L.P50])} (${signedPct(endBand[L.P50] / last - 1)})`;
   $("m-live-band").textContent =
-    `80% band ${fmtPrice(endBand[L.P10])} – ${fmtPrice(endBand[L.P90])} at ${fmtTime(timeAt(d.n + d.H - 1), d.interval_ms)} UTC`;
+    `80% band ${fmtPrice(endBand[L.P10])} – ${fmtPrice(endBand[L.P90])} at ${fmtTime(timeAt(d.n + d.H - 1), d.interval_ms)} ${tzLabel()}`;
+  const lp = state.livePrice;
+  if (lp && lp.price != null) {
+    // compare with the band forecast for the close of the bar that is forming now (first step)
+    const b0 = d.live.bands[0];
+    const where = lp.price < b0[L.P10] ? " · below this bar's 80% band" : lp.price > b0[L.P90] ? " · above this bar's 80% band" : " · inside this bar's 80% band";
+    $("m-live-band").textContent += ` · now ${fmtPrice(lp.price)}${where}`;
+  }
 }
 
 // ---------- drawing ----------
@@ -402,6 +522,10 @@ function targetCamera(p) {
       lo = Math.min(lo, s[L.P05]);
       hi = Math.max(hi, s[L.P95]);
     }
+  }
+  if (state.livePrice?.price != null && p >= d.end - 1e-6) {
+    lo = Math.min(lo, state.livePrice.price);
+    hi = Math.max(hi, state.livePrice.price);
   }
   if (!isFinite(lo)) { lo = d.close[d.n - 1] * 0.95; hi = d.close[d.n - 1] * 1.05; }
   const pad = (hi - lo) * 0.08 || Math.abs(hi) * 0.01 || 1;
@@ -537,6 +661,22 @@ function draw() {
     ctx.fill();
   }
 
+  // live: the current price inside the forming bar, against the cone
+  const lx = livePriceX();
+  if (lx != null && state.livePrice.price != null && p >= d.end - 1e-6) {
+    const lp = state.livePrice.price;
+    const pulse = 5 + 3 * (0.5 + 0.5 * Math.sin(performance.now() / 300));
+    ctx.strokeStyle = COLORS.text;
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(X(lx), Y(lp), pulse, 0, Math.PI * 2); ctx.stroke();
+    ctx.fillStyle = COLORS.text;
+    ctx.beginPath(); ctx.arc(X(lx), Y(lp), 3, 0, Math.PI * 2); ctx.fill();
+    ctx.font = "600 12px ui-sans-serif, system-ui, sans-serif";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "bottom";
+    ctx.fillText(`now ${fmtPrice(lp)}`, X(lx) + 10, Y(lp) - 6);
+  }
+
   // playhead
   const px = X(Math.min(p, d.n) - 1);
   ctx.strokeStyle = COLORS.playhead;
@@ -655,7 +795,14 @@ function drawHud(w, h, plot) {
   ctx.textAlign = "left";
   ctx.fillStyle = COLORS.text;
   ctx.font = "700 22px ui-sans-serif, system-ui, sans-serif";
-  ctx.fillText(`${d.symbol} · ${d.interval}`, 16, 32);
+  const name = d.info?.name && d.info.name !== d.symbol ? `  ${d.info.name}` : "";
+  ctx.fillText(`${d.symbol} · ${d.interval}${d.info?.currency ? ` · ${d.info.currency}` : ""}`, 16, 32);
+  if (name) {
+    const w0 = ctx.measureText(`${d.symbol} · ${d.interval}${d.info?.currency ? ` · ${d.info.currency}` : ""}`).width;
+    ctx.font = "15px ui-sans-serif, system-ui, sans-serif";
+    ctx.fillStyle = COLORS.muted;
+    ctx.fillText(name.length > 40 ? name.slice(0, 39) + "…" : name, 16 + w0, 32);
+  }
   ctx.fillStyle = COLORS.muted;
   ctx.font = "13px ui-sans-serif, system-ui, sans-serif";
   const modelName = d.model.split("/").pop();
@@ -1017,8 +1164,14 @@ $("lb-table").addEventListener("click", (e) => {
   if (th) { lb.sort = th.dataset.k; renderLeaderboard(); return; }
   const tr = e.target.closest("tr[data-s]");
   if (tr) {
-    $("symbol").value = tr.dataset.s;
     window.scrollTo({ top: 0, behavior: "smooth" });
+    if (window.COINBAND_STATIC) {
+      const row = lb.rows.find((r) => r.symbol === tr.dataset.s);
+      $("showcase").value = row.file;
+      loadStatic(row.file);
+      return;
+    }
+    $("symbol").value = tr.dataset.s;
     runBacktest();
   }
 });
@@ -1033,7 +1186,8 @@ async function runLeaderboard(ev) {
   $("lb-run").disabled = true;
   $("lb-progress").textContent = "Submitting…";
   try {
-    const result = await runJob("/api/leaderboard", body, (job) => ($("lb-progress").textContent = phaseLabel(job)));
+    if (myJobs.leaderboard) cancelJob(myJobs.leaderboard);
+    const result = await runJob("/api/leaderboard", body, (job) => ($("lb-progress").textContent = phaseLabel(job)), "leaderboard");
     lb.rows = result.rows;
     lb.trend = result.params.trend_window > 0;
     const p = result.params;
@@ -1043,11 +1197,74 @@ async function runLeaderboard(ev) {
       (lb.trend ? `, ${p.trend_window}-bar trend` : "") + " · click a row to replay it";
     renderLeaderboard();
   } catch (e) {
-    el.hidden = false;
-    el.textContent = e.message;
-    $("lb-progress").textContent = "";
+    if (e instanceof Cancelled) {
+      $("lb-progress").textContent = "Cancelled";
+    } else {
+      el.hidden = false;
+      el.textContent = e.message;
+      $("lb-progress").textContent = "";
+    }
   } finally {
     $("lb-run").disabled = false;
+  }
+}
+
+// ---------- live mode ----------
+
+const liveState = { timer: null, busy: false };
+
+function stopLive() {
+  clearInterval(liveState.timer);
+  liveState.timer = null;
+  $("live").checked = false;
+  $("live-status").textContent = "";
+}
+
+function startLive() {
+  clearInterval(liveState.timer);
+  liveTick();
+  liveState.timer = setInterval(liveTick, LIVE_EVERY_MS);
+}
+
+// x position of the current price: inside the bar that is forming after the last closed one
+function livePriceX() {
+  const d = state.data;
+  const lp = state.livePrice;
+  if (!d || !lp || lp.time == null) return null;
+  const start = (d.future_time && d.future_time[0]) || d.time[d.n - 1] + d.interval_ms;
+  const frac = Math.max(0, Math.min(1, (lp.time - start) / d.interval_ms));
+  return d.n - 1 + frac;
+}
+
+async function liveTick() {
+  const r = state.result;
+  if (liveState.busy || !r) return;
+  liveState.busy = true;
+  $("live-status").textContent = "updating…";
+  try {
+    const body = { source: r.source, symbol: r.symbol, interval: r.interval, model: r.model, ...r.params, since: r.time[r.time.length - 1] };
+    const L = await api("/api/live", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    if (state.result !== r) return; // a new backtest replaced this one meanwhile
+    const nb = L.new_bars;
+    const merged = {
+      ...r,
+      time: r.time.concat(nb.time),
+      close: r.close.concat(nb.close),
+      high: r.high.concat(nb.high),
+      low: r.low.concat(nb.low),
+      future_time: L.future_time,
+    };
+    const live = { ...L.live, index: merged.close.length };
+    // new closed bars: the old live forecast becomes a past one; otherwise replace it
+    merged.origins = nb.time.length ? r.origins.concat([live]) : r.origins.slice(0, -1).concat([live]);
+    state.livePrice = { price: L.price, time: L.price_time };
+    loadResult(merged, { live: true });
+    const at = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    $("live-status").textContent = `updated ${at}` + (nb.time.length ? ` · ${nb.time.length} new bar${nb.time.length > 1 ? "s" : ""}` : "");
+  } catch (e) {
+    $("live-status").textContent = `live update failed: ${e.message}`;
+  } finally {
+    liveState.busy = false;
   }
 }
 
@@ -1061,6 +1278,11 @@ function setView(v) {
 
 $("run-form").addEventListener("submit", runBacktest);
 $("lb-form").addEventListener("submit", runLeaderboard);
+$("source").addEventListener("change", () => applySource(false));
+$("cancel-run").addEventListener("click", () => myJobs.backtest && cancelJob(myJobs.backtest));
+setInterval(() => document.visibilityState === "visible" && refreshQueue(), 2000);
+$("lb-symbols").addEventListener("input", (e) => (e.target.dataset.touched = "1"));
+$("live").addEventListener("change", (e) => (e.target.checked ? startLive() : stopLive()));
 $("play").addEventListener("click", () => play(!state.playing));
 $("restart").addEventListener("click", () => { setPlayhead(state.data.start); state.cam = null; play(true); });
 $("scrub").addEventListener("input", (e) => {
@@ -1081,19 +1303,76 @@ document.addEventListener("keydown", (e) => {
 });
 window.addEventListener("resize", () => { state.cam = null; });
 
+// ---------- static demo (GitHub Pages): precomputed runs, no server ----------
+
+async function loadStatic(file) {
+  showError("");
+  setProgress("Loading…", 0.3);
+  try {
+    const r = await (await fetch(file)).json();
+    loadResult(r);
+    setProgress(`${r.symbol}: ${r.origins.length} hourly forecasts, computed ${r.generated || ""}`, 1);
+  } catch (e) {
+    showError(`Could not load ${file}: ${e.message}`);
+  }
+}
+
+async function staticInit() {
+  const S = window.COINBAND_STATIC;
+  const idx = await (await fetch(S.index)).json();
+  const runs = idx.runs;
+  $("run-form").innerHTML = `
+    <label>Coin <select id="showcase"></select></label>
+    <div id="progress" class="progress" hidden><div class="bar"><div id="progress-fill"></div></div><div id="progress-text"></div></div>
+    <div id="error" class="error" hidden></div>
+    <p class="hint">Precomputed on ${idx.generated} with ${idx.model_name}: a new ${idx.horizon}-hour forecast every hour
+      for the last ${idx.days} days, on Binance hourly prices. Scrub, replay and record it here.</p>
+    <p class="hint">To run any coin, stock or index, with live forecasts that refresh every minute,
+      <a href="${S.repo}">run coinband on your machine</a>.</p>`;
+  const sel = $("showcase");
+  sel.replaceChildren(...runs.map((r) => Object.assign(document.createElement("option"), { value: r.file, textContent: `${r.symbol}  ${r.summary.crps_skill >= 0 ? "+" : ""}${(r.summary.crps_skill * 100).toFixed(1)}% CRPS skill` })));
+  sel.addEventListener("change", () => loadStatic(sel.value));
+  $("lb-form").style.display = "none";
+  $("live").parentElement.style.display = "none";
+  $("live-status").style.display = "none";
+  $("queue").hidden = true;
+  const link = document.querySelector(".paper-link");
+  link.href = S.article;
+  link.textContent = "Read the article";
+  lb.rows = runs.map((r) => ({ symbol: r.symbol, summary: r.summary, live_change: r.live_change, file: r.file }));
+  lb.trend = false;
+  renderLeaderboard();
+  $("lb-progress").textContent = "";
+  document.querySelector(".leaderboard h2 .sub").textContent = `${idx.model_name} · last ${idx.days} days · click a row to replay it`;
+  requestAnimationFrame(frame);
+  const want = new URLSearchParams(location.hash.slice(1)).get("symbol");
+  const first = runs.find((r) => r.symbol === want) || runs[0];
+  sel.value = first.file;
+  loadStatic(first.file);
+}
+
 (async function init() {
+  if (window.COINBAND_STATIC) {
+    await staticInit();
+    return;
+  }
   try {
     await loadModels();
   } catch (e) {
     showError(`Server unreachable: ${e.message}`);
   }
+  try {
+    MARKETS = await api("/api/markets");
+  } catch { /* server unreachable, reported above */ }
+  applySource(true);
   restoreForm();
   // Shareable links: #symbol=ETHUSDT&interval=4h&horizon=12&run fills the form (and runs it).
   const hash = new URLSearchParams(location.hash.slice(1));
-  for (const f of FORM_FIELDS) if (hash.has(f)) $(f).value = hash.get(f);
+  if (hash.has("source")) { $("source").value = hash.get("source"); applySource(false); }
+  for (const f of FORM_FIELDS) if (hash.has(f) && f !== "source") $(f).value = hash.get(f);
   if (hash.has("covariates")) $("covariates").checked = hash.get("covariates") !== "0";
   if (hash.get("view") === "full") setView("full");
-  loadSymbols();
   requestAnimationFrame(frame);
+  refreshQueue();
   if (hash.has("run")) $("run-form").requestSubmit();
 })();

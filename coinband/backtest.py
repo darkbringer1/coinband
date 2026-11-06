@@ -246,8 +246,13 @@ def run_backtest(
     progress: Callable[[int, int], None] | None = None,
     volume: Sequence[float] | None = None,
     raw: bool = False,
+    past_covariates: np.ndarray | None = None,
+    known_covariates: np.ndarray | None = None,
 ) -> dict:
     """Walk-forward backtest; see the module docstring.
+
+    `past_covariates` `(C, T)` adds rows known only up to each origin (aligned with `close`); `known_covariates`
+    `(C, T + horizon)` adds rows known ahead of time, such as the calendar, covering the horizon after the data end.
 
     With `raw=True` the result also holds `raw`: `index` (N,), `q` (N, H, Q) forecast quantiles and
     `naive_q` (N, H, Q) for every origin, for offline analysis (not JSON-serializable).
@@ -271,6 +276,16 @@ def run_backtest(
         if volume is None or len(volume) != n:
             raise ValueError("covariates need a volume series as long as the prices")
         covs = covariate_rows(series, np.asarray(volume, dtype=np.float64))
+    if past_covariates is not None:
+        extra = np.asarray(past_covariates, dtype=np.float32)
+        if extra.ndim != 2 or extra.shape[1] != n:
+            raise ValueError(f"past_covariates must be (C, {n})")
+        covs = extra if covs is None else np.concatenate([covs, extra])
+    known = None
+    if known_covariates is not None:
+        known = np.asarray(known_covariates, dtype=np.float32)
+        if known.ndim != 2 or known.shape[1] != n + params.horizon:
+            raise ValueError(f"known_covariates must be (C, {n + params.horizon})")
 
     raw_q: list[np.ndarray] = []
     raw_naive: list[np.ndarray] = []
@@ -284,16 +299,23 @@ def run_backtest(
     for start in range(0, total, params.batch_size):
         chunk = origins[start : start + params.batch_size]
         batch = np.full((len(chunk), 1, ctx_len), np.nan, dtype=np.float32)
-        cov_batch = np.full((len(chunk), 2, ctx_len), np.nan, dtype=np.float32) if covs is not None else None
+        cov_batch = np.full((len(chunk), len(covs), ctx_len), np.nan, dtype=np.float32) if covs is not None else None
+        known_batch = (
+            np.full((len(chunk), len(known), ctx_len + params.horizon), np.nan, dtype=np.float32) if known is not None else None
+        )
         for row, i in enumerate(chunk):
             lo = max(0, i - ctx_len)
             batch[row, 0, ctx_len - (i - lo) :] = series[lo:i]
             if cov_batch is not None:
                 cov_batch[row, :, ctx_len - (i - lo) :] = covs[:, lo:i]
+            if known_batch is not None:
+                known_batch[row, :, ctx_len - (i - lo) :] = known[:, lo : i + params.horizon]
+        extra_kw = {}
         if cov_batch is not None:
-            forecast = forecaster.forecast(batch, prediction_length=params.horizon, past_covariates=cov_batch)
-        else:
-            forecast = forecaster.forecast(batch, prediction_length=params.horizon)
+            extra_kw["past_covariates"] = cov_batch
+        if known_batch is not None:
+            extra_kw["known_covariates"] = known_batch
+        forecast = forecaster.forecast(batch, prediction_length=params.horizon, **extra_kw)
         q_all = _to_numpy(forecast.quantiles)
         if q_all.shape[:3] != (len(chunk), 1, params.horizon) or q_all.shape[3] != len(levels):
             raise ValueError(f"forecaster returned quantiles shaped {q_all.shape}")
@@ -332,7 +354,7 @@ def run_backtest(
         "raw": out_raw,
         "levels": list(BAND_LEVELS),
         "trend": trend,
-        "covariates": covs is not None,
+        "covariates": covs is not None or known is not None,
         "origins": results,
         "summary": summary,
     }
